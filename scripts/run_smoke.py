@@ -108,6 +108,10 @@ def _serve_smoke():
     import importlib
     import src.serving.app as app_mod
     importlib.reload(app_mod)
+    # reload 会重建默认路径的 Config（指向 models/checkpoints），此处回填冒烟隔离路径，
+    # 保证 CI（无正式权重）也全程使用 models/smoke 产物
+    app_mod.conf.model_save_path = conf.model_save_path
+    app_mod.conf.student_save_path = conf.student_save_path
     client = TestClient(app_mod.app)
     resp = client.post("/predict", json={"texts": ["寄两份合同文件", "一箱东西"]})
     assert resp.status_code == 200, resp.text
