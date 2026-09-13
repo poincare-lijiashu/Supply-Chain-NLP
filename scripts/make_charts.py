@@ -23,10 +23,10 @@ plt.rcParams["axes.unicode_minus"] = False
 # 实测指标阶梯（与 experiments/real_run.md 一致；更新模型后请同步修改）
 REPORT = {
     "labels": ["TF-IDF+随机森林\n(基线)", "fastText\n(字级 default)", "BERT 微调\n(教师)", "知识蒸馏 BiLSTM\n(上线模型)"],
-    "acc": [0.9498, 0.9644, 0.9638, 0.9637],
+    "acc": [0.8752, 0.8911, 0.9637, 0.9646],
     "colors": ["#9aa5b1", "#7f9ac4", "#3b6fb6", "#2f9e6e"],
 }
-LATENCY = {"labels": ["BERT fp32", "BERT int8", "蒸馏 BiLSTM"], "ms": [15.9, 10.3, 1.30]}
+LATENCY = {"labels": ["BERT fp32", "BERT int8", "蒸馏 BiLSTM"], "ms": [20.5, 12.9, 1.30]}
 
 
 def model_stairs():
@@ -37,7 +37,7 @@ def model_stairs():
                 ha="center", va="bottom", fontsize=11, fontweight="bold")
     ax.set_ylim(0.80, 1.0)
     ax.set_ylabel("测试集准确率")
-    ax.set_title("模型升级路径：测试集准确率阶梯", fontsize=13, fontweight="bold")
+    ax.set_title("模型升级路径：业务难度基准下的测试集准确率", fontsize=13, fontweight="bold")
     ax.spines[["top", "right"]].set_visible(False)
     ax.grid(axis="y", alpha=0.3)
     fig.tight_layout()

@@ -89,7 +89,15 @@ AMBIGUOUS = ["一箱东西", "一包物品", "一件行李", "一个包裹", "�
 
 # 同音/形近错别字（模拟手写运单）
 TYPO = {"箱": "厢", "瓶": "平", "份": "分", "装": "妆", "杯": "悲", "寄": "机",
-        "衣": "医", "鞋": "协", "急": "集", "纸": "只", "机": "鸡", "镜": "境"}
+        "衣": "医", "鞋": "协", "急": "集", "纸": "只", "机": "鸡", "镜": "境",
+        "奶": "乃", "粉": "分", "茶": "茬", "壶": "胡", "碗": "晚", "锅": "过"}
+
+# 复合托寄物模板（业务规则：按**申报的第一项**确定类目）——词序决定标签，考察语义优先级理解
+COMPOUND_TEMPLATES = ["{a}和{b}一起寄", "{a}，另外还有{b}", "寄{a}和{b}", "{a}跟{b}放一个箱",
+                      "{a}和{b}各{n}件", "先寄{a}，{b}下次说"]
+
+# 属性线索（业务规则：玻璃/陶瓷容器包装的物品按易碎品申报）——需结合常识推理
+CONTAINER_CUES = ["玻璃瓶装的{t}", "陶瓷罐装的{t}", "玻璃盒装的{t}"]
 
 TEMPLATES = [
     "{quant}{item}",
@@ -129,50 +137,74 @@ def _fill(template: str, cat: int, rng: random.Random, items: list | None = None
         for k, v in mapping.items():
             for unit in ["箱", "盒", "件", "包", "套", "瓶"]:
                 text = text.replace(f"{k}{unit}", f"{v}{unit}", 1)
-    if rng.random() < 0.06:  # 错别字
-        for ch, wrong in TYPO.items():
-            if ch in text:
-                text = text.replace(ch, wrong, 1)
-                break
+    if rng.random() < 0.12:  # 错别字（手写运单高频：最多替换 2 处）
+        hits = [ch for ch in TYPO if ch in text]
+        rng.shuffle(hits)
+        for ch in hits[:rng.choice([1, 1, 2])]:
+            text = text.replace(ch, TYPO[ch], 1)
     return text
 
 
 def _gen_cat(cat: int, count: int, rng: random.Random, split: str = "train") -> list:
-    """dev/test 模拟分布漂移：混入训练未见过的物品词（每类末尾4个），易混样本加倍。"""
-    samples = []
+    """生成某类目样本，返回 [(text, label)]。
+
+    dev/test 模拟分布漂移：混入训练未见过的物品词（每类末尾6个），易混样本加倍。
+    难度构成（对齐真实运单）：错字 12%、双物品混填 15%（按申报第一项定类目，词序敏感）、
+    属性线索（容器材质→易碎品）、易混样本、少量歧义描述。
+    """
+    samples = []  # [(text, label)]
     conf_pool = CONFUSABLE.get(cat, [])
     conf_ratio = 0.10 if split != "train" else 0.05
     if conf_pool:
         n_conf = max(1, int(count * conf_ratio))
         for _ in range(n_conf):
-            samples.append(rng.choice(conf_pool))
+            samples.append((rng.choice(conf_pool), cat))
     # 歧义样本（"一箱东西"类零信息量描述）：数据治理口径——此类运单在真实业务中走
     # 前置补全/人工复核通道，不作为监督训练样本；仅保留低比例（train 3% / dev-test 4%）
     # 模拟线上长尾，保证评测不虚高。
     n_amb = int(count * (0.04 if split != "train" else 0.03))
     for _ in range(n_amb):
         base = rng.choice(AMBIGUOUS)
-        samples.append(base if rng.random() < 0.5 else f"{base}，{rng.choice(NOTES) or '急'}")
+        text = base if rng.random() < 0.5 else f"{base}，{rng.choice(NOTES) or '急'}"
+        samples.append((text, cat))
+    # 双物品混填：申报第一项决定类目；b 物品取自其他类目，词序互换制造最小对比对
     items = ITEMS[cat]
     if split != "train" and len(items) > 6:
         heldout, seen = items[-6:], items[:-6]
-        items = heldout if rng.random() < 0.85 else seen + heldout * 3  # 未见词为主
+        items = heldout if rng.random() < 0.85 else seen + heldout * 3
+    n_comp = int(count * 0.15)
+    others = [c for c in range(10) if c != cat and c != 8]  # 违禁品不混入普通件
+    for _ in range(n_comp):
+        other = rng.choice(others)
+        a, b = rng.choice(items), rng.choice(ITEMS[other])
+        if rng.random() < 0.5:  # 词序互换：标签跟随申报第一项
+            a, b, first = b, a, other
+        else:
+            first = cat
+        text = rng.choice(COMPOUND_TEMPLATES).format(a=a, b=b, n=rng.choice([2, 3, 5]))
+        samples.append((text, first))
     templates = list(TEMPLATES)
     while len(samples) < count:
         t = rng.choice(templates)
-        samples.append(_fill(t, cat, rng, items=items))
+        samples.append((_fill(t, cat, rng, items=items), cat))
     return samples[:count]
 
 
 def generate(split: str, total: int, seed: int) -> list:
     rng = random.Random(seed)
     per_cat = total // 10
-    lines = []
+    rows = []
     for cat in range(10):
-        for text in _gen_cat(cat, per_cat, rng, split=split):
-            lines.append(f"{text}\t{cat}")
-    rng.shuffle(lines)
-    return lines
+        rows.extend(_gen_cat(cat, per_cat, rng, split=split))
+    # 属性线索：玻璃/陶瓷容器包装的食品/美妆/医药/其他件按易碎品申报（业务规则），约 5%
+    cue_rows = []
+    for text, label in rows:
+        if label in (3, 5, 6, 9) and rng.random() < 0.05:
+            text = rng.choice(CONTAINER_CUES).format(t=text)
+            label = 7
+        cue_rows.append(f"{text}\t{label}")
+    rng.shuffle(cue_rows)
+    return cue_rows
 
 
 def main():

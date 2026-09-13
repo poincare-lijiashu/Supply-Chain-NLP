@@ -22,6 +22,12 @@
 - [ ] CI：`.github/workflows/ci.yml` 已提供（pytest + 冒烟）；**首跑绿了才挂徽章**——没有绿 CI 不挂 CI 徽章
 - [ ] Release：tag 用 v 前缀语义化版本（如 v1.2.0），notes 分「核心功能/质量与安全/复现口径」
 
+## 仓库元数据（gh token 权限不足，需在 GitHub Settings 手动填写）
+
+- **About 描述**：物流寄件文本智能分类系统：BERT 微调 → 知识蒸馏（96.37%，20.9MB，CPU 1.3ms）→ FastAPI + Docker 部署，违禁品红线自动转人工
+- **Topics**：`nlp` `bert` `knowledge-distillation` `text-classification` `fastapi` `logistics` `pytorch` `docker`
+- **Website**（可选）：无
+
 ## 发布排除清单（孤儿分支导出时不入库）
 
 - [ ] `docs/NEXT-SESSION.md`（内部交接快照）

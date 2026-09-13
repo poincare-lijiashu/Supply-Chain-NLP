@@ -32,7 +32,11 @@
 - 全部指标为治理后实测：README 第 4 节阶梯表 + experiments/real_run.md 同源；图表 docs/img/*（make_charts 生成）
 - 功能点对照矩阵 34 项全部核销：`docs/rewrite_matrix.md`
 - 全链路冒烟（治理后数据 + weights_only/state_dict 新代码路径）：本机通过
-- 推送 GitHub：空仓 `poincare-lijiashu/Supply-Chain-NLP`，孤儿分支单提交（noreply 身份）首推 main
+- 推送 GitHub：已完成（publish 孤儿分支 → origin/main，noreply 身份，66+2 commits）；**CI 首跑绿**
+  （run 34749900614，8 步全过）；Release v1.2.0 已建；CI/License/Tests 徽章已挂
+- CI 修复两轮：① CI 无 400MB 权重 → 冒烟前守卫式 hf_hub_download；② reload 重建 conf 致服务冒烟
+  指向正式权重路径 → 回填冒烟隔离路径（本地有权重所以从未暴露的潜伏 bug）
+- 待手动（gh token 权限不足）：仓库 Settings 里填 About 描述与 topics（文案见 release_checklist.md）
 - demo 化字样已全局清理（课程/简历/讲义/讲师）；NEXT-SESSION、rewrite_matrix、release_checklist 三份内部文档不入库
 
 ## 已知事项 / Backlog
@@ -48,3 +52,10 @@
 cd "D:\workspace_AI\workspace_traecode\xiangmu_traecode\Supply Chain NLP"
 D:\software_work\conda_envs\SupplyChainNLP\python.exe -m pytest -q
 ```
+
+## 分支模型（重要）
+
+- `main`（本地）：完整开发历史 + 全部内容（含内部文档），日常工作分支
+- `publish`（本地+远端）：孤儿分支单提交导出树，推送目标 `origin/main`；**不含** NEXT-SESSION / rewrite_matrix / release_checklist
+- 后续改动流程：main 上开发 → 需要公开时把变更同步到 publish（cherry-pick 或 read-tree）→ push publish:main
+- 网络注意：github.com 直连间歇被断，本机 7897 端口有代理，用 `git -c http.proxy=http://127.0.0.1:7897 push ...`
