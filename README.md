@@ -21,32 +21,9 @@
 
 ## 2. 系统架构
 
-```mermaid
-flowchart LR
-    subgraph 数据层
-        GEN["托寄物文本合成器<br/>18w 训练 / 1w 验证 / 1w 测试<br/>错字/混填/属性线索难度基准"]
-        CLASS["class.txt<br/>10 类目体系"]
-    end
-    subgraph 训练管线
-        BASE["① 基线<br/>TF-IDF + 随机森林"]
-        FT["② fastText<br/>字/词级 × autotune"]
-        BERT["③ BERT 微调<br/>bert-base-chinese"]
-        COMP["④ 模型压缩<br/>int8 量化 · 知识蒸馏<br/>L1 剪枝"]
-    end
-    subgraph 推理服务
-        API["FastAPI /predict<br/>单例模型 · 鉴权 · 限流<br/>入参上限"]
-        FRONT["前端工作台<br/>批量输入 · 置信度可视化"]
-        HUMAN["人工复核队列<br/>低置信度 / 违禁品红线"]
-    end
-    LLM["LLM 对照实验<br/>DeepSeek few-shot<br/>（选型论证）"]
+![系统架构](docs/img/architecture.svg)
 
-    GEN --> BASE --> FT --> BERT --> COMP --> API
-    CLASS --> GEN
-    LLM -. 选型对照 .-> BERT
-    API --> FRONT
-    API -- "needs_human_review" --> HUMAN
-    HUMAN -. 补充标注回流 .-> GEN
-```
+> 交互版（含暗色主题）：[docs/img/architecture.html](docs/img/architecture.html)
 
 **设计要点**
 
