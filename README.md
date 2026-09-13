@@ -1,5 +1,10 @@
 # Supply Chain NLP —— 物流寄递场景寄件文本智能分类系统
 
+![CI](https://github.com/poincare-lijiashu/Supply-Chain-NLP/actions/workflows/ci.yml/badge.svg)
+![License](https://img.shields.io/badge/license-MIT-green)
+![Python](https://img.shields.io/badge/python-3.11%2B-blue)
+![Pytest](https://img.shields.io/badge/tests-24%20passed-brightgreen)
+
 > 短文本多分类：把用户下单时填写的**托寄物描述与寄件备注**实时分到 10 个类目，
 > 替代人工完成寄件初审的分类环节，支撑自动制单、计费定价与违禁品初筛。
 > 技术路径：**TF-IDF+随机森林基线 → fastText → BERT 微调 → 模型量化 → 知识蒸馏 → FastAPI 部署**。
