@@ -1,4 +1,4 @@
-# NEXT-SESSION 交接快照（2026-09-13 · 安全加固轮后）
+# NEXT-SESSION 交接快照（2026-09-13 · 难度基准轮后）
 
 ## 项目一句话
 
@@ -25,19 +25,15 @@
 5. README 第 2 节数据口径声明（合成演示数据 vs 生产口径）；`docs/DEPLOY.md` 部署指南；fix_log 第二节加固留档；LICENSE(MIT)
 6. 详见 `docs/fix_log.md` 第二节 + `docs/release_checklist.md`
 
-## 当前状态
+## 当前状态（难度基准轮 · 最终）
 
-- **模型已升级（治理后数据重训）**：BERT 96.38% / 蒸馏学生 96.37%（此前 87% 档，根因是 11-14% 歧义样本噪声上限；
-  数据治理把歧义降到 3-4% 后跃升——generate_data.py 内有治理口径注释）
-- 全部指标为治理后实测：README 第 4 节阶梯表 + experiments/real_run.md 同源；图表 docs/img/*（make_charts 生成）
-- 功能点对照矩阵 34 项全部核销：`docs/rewrite_matrix.md`
-- 全链路冒烟（治理后数据 + weights_only/state_dict 新代码路径）：本机通过
-- 推送 GitHub：已完成（publish 孤儿分支 → origin/main，noreply 身份，66+2 commits）；**CI 首跑绿**
-  （run 34749900614，8 步全过）；Release v1.2.0 已建；CI/License/Tests 徽章已挂
-- CI 修复两轮：① CI 无 400MB 权重 → 冒烟前守卫式 hf_hub_download；② reload 重建 conf 致服务冒烟
-  指向正式权重路径 → 回填冒烟隔离路径（本地有权重所以从未暴露的潜伏 bug）
-- 待手动（gh token 权限不足）：仓库 Settings 里填 About 描述与 topics（文案见 release_checklist.md）
-- demo 化字样已全局清理（课程/简历/讲义/讲师）；NEXT-SESSION、rewrite_matrix、release_checklist 三份内部文档不入库
+- **难度基准 v1.2 数据**（generate_data.py）：错字 12%×2处、双物品混填 15%（申报第一项定类目，词序敏感）、
+  容器材质属性线索、heldout 漂移、歧义 3-4% —— 目的：让"训练的价值"在阶梯图上可见
+- **最终实测阶梯**：RF 87.52 / fastText default 89.11-89.71 / **BERT 96.37** / **蒸馏学生 96.46（反超教师）**
+  / int8 96.40 / 剪枝 96.38；fastText autotune 96.4（需 300s 逐场景调参）；延迟 20.5/12.9/1.30ms
+- 图表 docs/img/* 已更新（阶梯拉开 + 压缩收益）；README 第 3/4 节按"两条价值曲线"叙事重构
+- pytest 24 passed；公开历史已**压平重导出**：origin/main = 041596c 单 init 提交，v1.2.0 标签重指
+- 分支模型：main=完整历史；publish=孤儿单提交（发布导出）；推送走本机 7897 代理
 
 ## 已知事项 / Backlog
 

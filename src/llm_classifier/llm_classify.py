@@ -40,9 +40,9 @@ PROMPT = f"""你是一名快递寄件初审审核员，任务是将用户填写�
 def build_client():
     from langchain_openai import ChatOpenAI
     return ChatOpenAI(
-        base_url=os.getenv("BASE_URL"),
+        base_url=os.getenv("BASE_URL", "https://api.deepseek.com/v1"),
         api_key=os.getenv("DEEPSEEK_API_KEY"),
-        model="deepseek-chat",
+        model=os.getenv("LLM_MODEL", "deepseek-flash"),
         model_kwargs={"response_format": {"type": "json_object"}},
     )
 
@@ -51,7 +51,10 @@ def build_client():
 def invoke_llm(llm, text: str) -> dict:
     resp = llm.invoke([{"role": "system", "content": PROMPT},
                        {"role": "user", "content": f"托寄物描述：'{text}'，请分类。"}])
-    return json.loads(resp.content)
+    content = resp.content.strip()
+    if content.startswith("```"):  # 防御：部分网关会给 JSON 包 markdown 围栏
+        content = content.strip("`").removeprefix("json").strip()
+    return json.loads(content)
 
 
 def run_eval(conf: Config, n: int = 51):
@@ -86,7 +89,7 @@ def run_eval(conf: Config, n: int = 51):
                                    zero_division=0, digits=4)
     summary = (f"DeepSeek LLM 分类对照实验（{n} 条 dev 样本）\n"
                f"Acc={acc:.4f}, 总耗时={elapsed:.0f}s, 平均 {elapsed / n * 1000:.0f} ms/条\n"
-               f"（微调 BERT 口径 93.64% / 蒸馏 91.25%，且 LLM 单条成本远高于本地模型——选型论证用）\n\n{report}")
+               f"（微调 BERT / 蒸馏对照见 experiments/bert.md 与 distill.md；LLM 单条成本与延迟远高于本地模型——选型论证用）\n\n{report}")
     print(summary)
     return summary
 

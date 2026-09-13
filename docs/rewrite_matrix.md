@@ -36,7 +36,7 @@
 | 29 | 依赖锁定 | 无 requirements.txt | requirements.txt（真实版本） | ✅ |
 | 30 | 实验记录（可复现：seed 固定） | 无 | experiments/*.md + logs | ✅（新增） |
 | 31 | 冒烟测试（全链路小样本） | 无 | scripts/run_smoke.py + tests/test_smoke.py | ✅（新增） |
-| 32 | 简历/逐字稿口径对齐（84.3/91.7/93.64/91.25/23.1MB/17×/13×） | — | README.md 第 3 节 | ✅ |
+| 32 | 简历/逐字稿口径对齐（84.3/91.7/93.64/91.25/23.1MB/17×/13×） | — | README.md 第 3 节 | ✅（历史口径；v1.2 起公开数字以难度基准实测为准） |
 | 33 | bert-base-chinese 模型文件 | 04-bert/src/bert-base-chinese | models/bert-base-chinese（5 个必需文件） | ✅ |
 | 34 | 修复留档 | — | docs/fix_log.md | ✅（新增） |
 
