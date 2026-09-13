@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """冒烟测试：小样本跑通「数据 -> RF -> fasttext -> BERT -> 蒸馏 -> 量化 -> 服务推理」全链路。
-用法：python -m scripts.run_smoke   （项目根目录执行；每模块 2000 条训练，几分钟内完成，CPU 也能跑）"""
+用法：python -m scripts.run_smoke   （项目根目录执行；每模块 2000 条训练，几分钟内完成，CPU 也能跑；
+默认 2 epochs 只验证链路贯通，SMOKE_EPOCHS=4 可全保真复跑）"""
 import os
 import subprocess
 import sys
@@ -11,7 +12,9 @@ from config.config import Config  # noqa: E402
 conf = Config()
 SMOKE = 2000
 SMOKE_BATCH = int(os.getenv("SMOKE_BATCH", "128"))  # 内存紧张时可 SMOKE_BATCH=32 降低峰值占用
+SMOKE_EPOCHS = int(os.getenv("SMOKE_EPOCHS", "2"))  # 冒烟只验证链路贯通，2 epochs 足够；全保真可设 4
 conf.batch_size = SMOKE_BATCH
+conf.num_epochs = SMOKE_EPOCHS
 SMOKE_DIR = os.path.join(PROJECT_ROOT, "data", "smoke")
 ok = []
 
