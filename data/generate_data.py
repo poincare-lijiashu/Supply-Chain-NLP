@@ -96,8 +96,28 @@ TYPO = {"箱": "厢", "瓶": "平", "份": "分", "装": "妆", "杯": "悲", "�
 COMPOUND_TEMPLATES = ["{a}和{b}一起寄", "{a}，另外还有{b}", "寄{a}和{b}", "{a}跟{b}放一个箱",
                       "{a}和{b}各{n}件", "先寄{a}，{b}下次说"]
 
-# 属性线索（业务规则：玻璃/陶瓷容器包装的物品按易碎品申报）——需结合常识推理
-CONTAINER_CUES = ["玻璃瓶装的{t}", "陶瓷罐装的{t}", "玻璃盒装的{t}"]
+# 远距申报（业务规则同上：按第一件定类目）——申报词与物品词之间隔干扰短语，
+# 线性词袋模型无法跨越距离绑定"第一件"与物品，需要长程语义组合（结构盲区）
+REMOTE_TEMPLATES = ["第一件是{a}，{f}，第二件是{b}，按第一件申报",
+                    "{a}先寄，{f}，{b}下一批再说"]
+REMOTE_FILLERS = ["路上得走三天", "我打了三次包", "里面有缓冲气垫", "麻烦轻拿轻放", "上次碎过一个",
+                  "保价两百块", "这是补寄的", "备用件也放里面", "封箱前拍了照", "备注写不清了"]
+
+# 长距容器线索（业务规则：玻璃/陶瓷容器包装的物品按易碎品申报）——线索词与物品隔干扰短语，
+# 词袋无法远距绑定修饰关系（结构盲区）
+CONTAINER_CUES = ["玻璃瓶装的", "陶瓷罐装的", "玻璃盒装的", "水晶盒装的"]
+CUE_FILLERS = ["路上得走三天", "里面加了缓冲气垫", "我反复包了三层", "上次碎过一个",
+               "封箱前拍了照", "麻烦轻拿轻放"]
+
+# 否定翻转（业务规则：显式声明非易碎时按物品自身类目申报）——需要组合语义处理特征冲突
+NEGATION_TEMPLATES = ["不是易碎品，{c}装的{t}而已", "不用{c}了，普通袋子装的{t}",
+                      "别看是{c}装的{t}，不算易碎"]
+NEGATION_CONTAINERS = ["玻璃瓶", "陶瓷罐", "玻璃盒"]
+
+# 规格阈值（同一核心词，修饰语组合决定类目——线性模型无法为每个组合枚举特征）
+THRESHOLD_SAMPLES = [("充电宝2万毫安", 8), ("充电宝数据线两根", 2), ("充电宝收纳包", 2),
+                     ("5号电池一盒", 4), ("大容量锂电池组", 8), ("小纽扣电池若干", 4),
+                     ("瓶装高度白酒", 8), ("酒精棉片一小盒", 6)]
 
 TEMPLATES = [
     "{quant}{item}",
@@ -149,8 +169,9 @@ def _gen_cat(cat: int, count: int, rng: random.Random, split: str = "train") -> 
     """生成某类目样本，返回 [(text, label)]。
 
     dev/test 模拟分布漂移：混入训练未见过的物品词（每类末尾6个），易混样本加倍。
-    难度构成（对齐真实运单）：错字 12%、双物品混填 15%（按申报第一项定类目，词序敏感）、
-    属性线索（容器材质→易碎品）、易混样本、少量歧义描述。
+    难度构成（对齐真实运单 + 打在词袋模型结构盲区）：错字 12%、相邻混填 12%、
+    远距申报 6%（申报词与物品隔干扰短语）、规格阈值 3%、长距容器线索 5%、
+    否定翻转 4%、少量歧义描述。
     """
     samples = []  # [(text, label)]
     conf_pool = CONFUSABLE.get(cat, [])
@@ -172,7 +193,7 @@ def _gen_cat(cat: int, count: int, rng: random.Random, split: str = "train") -> 
     if split != "train" and len(items) > 6:
         heldout, seen = items[-6:], items[:-6]
         items = heldout if rng.random() < 0.85 else seen + heldout * 3
-    n_comp = int(count * 0.15)
+    n_comp = int(count * 0.12)
     others = [c for c in range(10) if c != cat and c != 8]  # 违禁品不混入普通件
     for _ in range(n_comp):
         other = rng.choice(others)
@@ -183,6 +204,17 @@ def _gen_cat(cat: int, count: int, rng: random.Random, split: str = "train") -> 
             first = cat
         text = rng.choice(COMPOUND_TEMPLATES).format(a=a, b=b, n=rng.choice([2, 3, 5]))
         samples.append((text, first))
+    # 远距申报：申报词与物品隔干扰短语，线性词袋无法远距绑定（结构盲区）
+    n_remote = int(count * 0.06)
+    for _ in range(n_remote):
+        other = rng.choice(others)
+        a, b = rng.choice(items), rng.choice(ITEMS[other])
+        text = rng.choice(REMOTE_TEMPLATES).format(a=a, b=b, f=rng.choice(REMOTE_FILLERS))
+        samples.append((text, cat))
+    # 规格阈值：同一核心词由修饰语组合决定类目
+    n_thr = int(count * 0.03)
+    for _ in range(n_thr):
+        samples.append(rng.choice(THRESHOLD_SAMPLES))
     templates = list(TEMPLATES)
     while len(samples) < count:
         t = rng.choice(templates)
@@ -196,15 +228,20 @@ def generate(split: str, total: int, seed: int) -> list:
     rows = []
     for cat in range(10):
         rows.extend(_gen_cat(cat, per_cat, rng, split=split))
-    # 属性线索：玻璃/陶瓷容器包装的食品/美妆/医药/其他件按易碎品申报（业务规则），约 5%
-    cue_rows = []
+    out = []
     for text, label in rows:
-        if label in (3, 5, 6, 9) and rng.random() < 0.05:
-            text = rng.choice(CONTAINER_CUES).format(t=text)
+        r = rng.random()
+        if label in (3, 5, 6, 9) and r < 0.05:
+            # 长距容器线索：线索词与物品隔干扰短语，按易碎品申报（结构盲区）
+            text = rng.choice(CONTAINER_CUES) + rng.choice(CUE_FILLERS) + "，里面是" + text
             label = 7
-        cue_rows.append(f"{text}\t{label}")
-    rng.shuffle(cue_rows)
-    return cue_rows
+        elif label in (3, 5, 6, 9) and r < 0.09:
+            # 否定翻转：显式声明非易碎，按物品自身类目申报（特征冲突）
+            text = rng.choice(NEGATION_TEMPLATES).format(
+                c=rng.choice(NEGATION_CONTAINERS), t=text)
+        out.append(f"{text}\t{label}")
+    rng.shuffle(out)
+    return out
 
 
 def main():

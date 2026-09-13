@@ -23,10 +23,10 @@ plt.rcParams["axes.unicode_minus"] = False
 # 实测指标阶梯（与 experiments/real_run.md 一致；更新模型后请同步修改）
 REPORT = {
     "labels": ["TF-IDF+随机森林\n(基线)", "fastText\n(字级 default)", "BERT 微调\n(教师)", "知识蒸馏 BiLSTM\n(上线模型)"],
-    "acc": [0.8752, 0.8911, 0.9637, 0.9646],
-    "colors": ["#9aa5b1", "#7f9ac4", "#3b6fb6", "#2f9e6e"],
+    "acc": [0.8614, 0.8828, 0.9652, 0.9649],
+    "colors": ["#9aa5b1", "#7f9ac4", "#3b6fb4", "#2f9e6e"],
 }
-LATENCY = {"labels": ["BERT fp32", "BERT int8", "蒸馏 BiLSTM"], "ms": [20.5, 12.9, 1.30]}
+LATENCY = {"labels": ["BERT fp32", "BERT int8", "蒸馏 BiLSTM"], "ms": [16.9, 12.7, 1.30]}
 
 
 def model_stairs():
