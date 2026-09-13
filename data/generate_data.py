@@ -119,6 +119,14 @@ THRESHOLD_SAMPLES = [("充电宝2万毫安", 8), ("充电宝数据线两根", 2)
                      ("5号电池一盒", 4), ("大容量锂电池组", 8), ("小纽扣电池若干", 4),
                      ("瓶装高度白酒", 8), ("酒精棉片一小盒", 6)]
 
+# 背景物品池：混填/远距的"第二件"优先用中性物品（无类目代表词），避免类目代表词
+# （奶粉/车厘子/合同…）被其他类目的标签污染先验；30% 保留跨类真实感
+BACKGROUND_ITEMS = ["纸箱", "泡沫箱", "冰袋", "胶带", "说明书", "袋子", "盒子", "赠品",
+                    "填充物", "包裹套", "缓冲气垫", "防潮袋"]
+
+# 馈赠句式（真实寄件高频："给XX寄的X"）——收件人亲疏不影响类目判定
+GIFT_TARGETS = ["小孩", "娃", "爸妈", "老人", "客户", "朋友", "我妈"]
+
 TEMPLATES = [
     "{quant}{item}",
     "{quant}{item}{note}",
@@ -134,6 +142,8 @@ TEMPLATES = [
     "{item}（{spec}）",
     "{quant}{item}，麻烦{note2}",
     "{item}，{note}",
+    "给{target}寄的{item}",
+    "给{target}的{item}{note}",
 ]
 
 
@@ -152,6 +162,7 @@ def _fill(template: str, cat: int, rng: random.Random, items: list | None = None
     )
     text = text.replace("{brand}", "").replace("  ", " ").strip("，, ")
     text = text.format(n=n)  # 解析 QUANT 中嵌套的 {n}
+    text = text.replace("{target}", rng.choice(GIFT_TARGETS))  # 馈赠句式收件人
     if rng.random() < 0.10:  # 数量转阿拉伯数字
         mapping = {"一": "1", "两": "2", "三": "3", "五": "5"}
         for k, v in mapping.items():
@@ -195,20 +206,26 @@ def _gen_cat(cat: int, count: int, rng: random.Random, split: str = "train") -> 
         items = heldout if rng.random() < 0.85 else seen + heldout * 3
     n_comp = int(count * 0.12)
     others = [c for c in range(10) if c != cat and c != 8]  # 违禁品不混入普通件
+
+    def _b_item() -> str:
+        """第二件物品：70% 中性背景物品（防类目代表词被跨类标签污染），30% 跨类真实感。"""
+        return rng.choice(BACKGROUND_ITEMS) if rng.random() < 0.7 else rng.choice(ITEMS[rng.choice(others)])
+
     for _ in range(n_comp):
         other = rng.choice(others)
-        a, b = rng.choice(items), rng.choice(ITEMS[other])
-        if rng.random() < 0.5:  # 词序互换：标签跟随申报第一项
+        a = rng.choice(items)
+        cross = rng.random() < 0.3  # 30% 用真实跨类物品（保留词序最小对比对），70% 中性背景物品
+        b = rng.choice(ITEMS[other]) if cross else rng.choice(BACKGROUND_ITEMS)
+        first = cat
+        if cross and rng.random() < 0.5:  # 词序互换：标签跟随申报第一项（背景物品无类目，不换序）
             a, b, first = b, a, other
-        else:
-            first = cat
         text = rng.choice(COMPOUND_TEMPLATES).format(a=a, b=b, n=rng.choice([2, 3, 5]))
         samples.append((text, first))
     # 远距申报：申报词与物品隔干扰短语，线性词袋无法远距绑定（结构盲区）
     n_remote = int(count * 0.06)
     for _ in range(n_remote):
         other = rng.choice(others)
-        a, b = rng.choice(items), rng.choice(ITEMS[other])
+        a, b = rng.choice(items), _b_item()
         text = rng.choice(REMOTE_TEMPLATES).format(a=a, b=b, f=rng.choice(REMOTE_FILLERS))
         samples.append((text, cat))
     # 规格阈值：同一核心词由修饰语组合决定类目
