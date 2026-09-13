@@ -2,6 +2,7 @@
 """BERT 文本分类：模型 / 数据 / 训练 / 评估 / 预测。相对初版实现修复三处缺陷：
 1) 训练保存逻辑反向（验证集提升才保存）；2) predict 循环内误用整批 texts 编码；
 3) evaluate 提前 break 只评一个 batch。"""
+import gc
 import os
 import time
 
@@ -129,6 +130,8 @@ def train(conf: Config, limit: int | None = None):
 
         dev_acc, dev_f1, _, _, _, _ = evaluate(model, dev_loader, conf, full=False)
         train_acc = accuracy_score(labels, preds)
+        gc.collect()  # 长训练防宿主内存碎片（受限内存机器上 MemoryError 防护）
+        torch.cuda.empty_cache()
         print(f"Epoch {epoch + 1}: loss={total_loss / len(train_loader):.4f} "
               f"train_acc={train_acc:.4f} dev_acc={dev_acc:.4f} dev_f1={dev_f1:.4f} "
               f"({train_time:.0f}s)")

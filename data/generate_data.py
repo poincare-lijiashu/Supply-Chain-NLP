@@ -159,10 +159,10 @@ def _fill(template: str, cat: int, rng: random.Random, items: list | None = None
         note=rng.choice(NOTES),
         note2=rng.choice(["轻放", "快点", "保价", "当天到", "防水"]),
         n=n,
+        target=rng.choice(GIFT_TARGETS),
     )
     text = text.replace("{brand}", "").replace("  ", " ").strip("，, ")
     text = text.format(n=n)  # 解析 QUANT 中嵌套的 {n}
-    text = text.replace("{target}", rng.choice(GIFT_TARGETS))  # 馈赠句式收件人
     if rng.random() < 0.10:  # 数量转阿拉伯数字
         mapping = {"一": "1", "两": "2", "三": "3", "五": "5"}
         for k, v in mapping.items():
