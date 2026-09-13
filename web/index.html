@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>寄件初审分类工作台 · Supply Chain NLP</title>
+<link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">Supply Chain <span>NLP</span></div>
+  <div class="top-meta">
+    <span class="badge" id="model-badge">模型加载中…</span>
+    <span class="health" id="health-dot" title="服务健康状态"></span>
+  </div>
+</header>
+
+<main class="workspace">
+  <!-- 左：输入工作区 -->
+  <section class="panel input-panel">
+    <h1>寄件初审分类</h1>
+    <p class="sub">输入托寄物描述或寄件备注，每行一条，支持批量。</p>
+    <textarea id="input" rows="8" spellcheck="false"
+      placeholder="例如：&#10;寄两份合同文件，明天必须到&#10;一箱车厘子&#10;充电宝2个"></textarea>
+    <div class="examples" id="examples">
+      <button class="chip" data-text="寄两份合同文件，明天必须到">合同文件</button>
+      <button class="chip" data-text="一箱车厘子">车厘子</button>
+      <button class="chip" data-text="给小孩寄的奶粉">奶粉</button>
+      <button class="chip" data-text="充电宝2个">充电宝（违禁）</button>
+      <button class="chip" data-text="陶瓷碗4个，轻拿轻放">陶瓷碗（易碎）</button>
+      <button class="chip" data-text="一箱东西">歧义样本</button>
+    </div>
+    <div class="actions">
+      <button id="run" class="primary">开始分类</button>
+      <button id="clear" class="ghost">清空</button>
+      <span class="hint" id="hint"></span>
+    </div>
+  </section>
+
+  <!-- 右：结果区 -->
+  <section class="panel result-panel">
+    <h2>分类结果</h2>
+    <div id="results" class="results empty">
+      <div class="empty-guide">
+        <p class="empty-title">三步完成寄件初审</p>
+        <ol>
+          <li>左侧输入托寄物描述（可批量多行）</li>
+          <li>点击「开始分类」，模型实时给出 10 类置信度</li>
+          <li>低置信度与违禁品命中自动标记 → 转人工复核</li>
+        </ol>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer class="foot">
+  <span>10 类目：文件资料 · 服饰鞋帽 · 数码家电 · 食品生鲜 · 日用百货 · 美妆个护 · 医药健康 · 易碎品 · 违禁品 · 其他</span>
+  <span class="foot-api">POST /predict · GET /health</span>
+</footer>
+
+<script src="/static/app.js"></script>
+</body>
+</html>

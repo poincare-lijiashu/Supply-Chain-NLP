@@ -1,0 +1,30 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install CPU deps
+        run: |
+          pip install torch==2.11.0 --index-url https://download.pytorch.org/whl/cpu
+          pip install -r requirements.txt
+          # fasttext 0.9.x 与 numpy 2.x 兼容补丁（与 Dockerfile 保持一致）
+          python -c "import fasttext, pathlib; p = pathlib.Path(fasttext.__file__).parent / 'FastText.py'; s = p.read_text(encoding='utf-8'); p.write_text(s.replace('np.array(probs, copy=False)', 'np.asarray(probs)'), encoding='utf-8')"
+      - name: Generate smoke data
+        run: python -m data.generate_data --train 4000 --dev 500 --test 500 --outdir data/raw
+      - name: Fetch BERT checkpoint (skip if present)
+        run: >
+          python -c "import os, shutil; from huggingface_hub import hf_hub_download; dst='models/bert-base-chinese/model.safetensors'; shutil.copy(hf_hub_download('bert-base-chinese', 'model.safetensors'), dst) if not os.path.exists(dst) else print('checkpoint ready')"
+      - name: Unit tests
+        run: python -m pytest -q
+      - name: Full pipeline smoke
+        run: python -m scripts.run_smoke

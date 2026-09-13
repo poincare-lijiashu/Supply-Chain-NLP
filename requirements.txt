@@ -1,0 +1,28 @@
+# Python 3.11 · 依赖以真实安装版本锁定（torch 按本机 CUDA 选择 wheel）
+torch==2.11.0
+transformers==5.17.0
+tokenizers==0.23.2
+safetensors==0.8.0
+scikit-learn==1.9.1
+scipy==1.17.1
+numpy==2.4.6
+pandas==3.0.5
+# fasttext-wheel 各平台可用版本不同：Windows 0.9.8 / Linux 0.9.2（功能一致）
+fasttext-wheel==0.9.8; sys_platform == "win32"
+fasttext-wheel==0.9.2; sys_platform == "linux"
+jieba==0.42.1
+fastapi==0.141.1
+uvicorn==0.52.4
+pydantic==2.13.5
+python-dotenv==1.2.3
+langchain-openai==1.6.2
+langchain-core==1.6.3
+openai==3.13.0
+tenacity==9.1.4
+matplotlib==3.11.2
+wordcloud==1.9.6
+tqdm==4.70.1
+pytest==9.1.1
+httpx==0.28.1
+requests==2.34.2
+joblib==1.6.0
