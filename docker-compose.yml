@@ -1,0 +1,21 @@
+# 物流寄件文本智能分类服务 —— 与本机其他项目容器组（material / edu_agent）完全隔离
+# 启动：docker compose up -d            （服务 http://localhost:18004）
+# 扩容：docker compose up -d --scale api=3   （无状态服务，可水平扩；前置 Nginx/网关做负载均衡）
+services:
+  api:
+    image: supply-chain-nlp:1.0.0
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: supply-chain-nlp-api
+    ports:
+      - "18004:8004"          # 宿主 18004 -> 容器 8004，避开本机已用端口段
+    environment:
+      MODEL_NAME: distill     # distill | bert_int8 | bert
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 2g
+    # 无状态：模型权重打包在镜像内，无外部数据卷依赖 —— 可任意扩容/迁移

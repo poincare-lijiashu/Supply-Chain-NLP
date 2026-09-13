@@ -1,0 +1,247 @@
+﻿
+===== [冒烟] 数据生成（小样本, data/smoke） =====
+train: 2000 条 -> D:\workspace_AI\workspace_traecode\xiangmu_traecode\Supply Chain NLP\data\smoke\train.txt
+   样例: 蛋糕自己囤的  ||  3
+   样例: 瓷碗四件套  ||  4
+   样例: 寄个油漆到付  ||  8
+dev: 400 条 -> D:\workspace_AI\workspace_traecode\xiangmu_traecode\Supply Chain NLP\data\smoke\dev.txt
+   样例: 三罐火腿肠，冰袋保鲜  ||  3
+   样例: 一箱，上次寄过一样的  ||  2
+   样例: 胰岛素（冷藏）  ||  6
+test: 400 条 -> D:\workspace_AI\workspace_traecode\xiangmu_traecode\Supply Chain NLP\data\smoke\test.txt
+   样例: 婚纱（压皱了）  ||  1
+   样例: 指甲油一堆  ||  5
+   样例: 寄个营业执照副本加急  ||  0
+
+===== [冒烟] RF 基线 =====
+python.exe : Building prefix dict from the default dictionary ...
+At line:15 char:1885
++ ... Chain NLP"; & "D:\software_work\conda_envs\SupplyChainNLP\python.exe" ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Building prefix... dictionary ...:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+Loading model from cache D:\cache\temp\jieba.cache
+Loading model cost 0.442 seconds.
+Prefix dict has been built successfully.
+train 预处理完成 -> D:\workspace_AI\workspace_traecode\xiangmu_traecode\Supply Chain NLP\data\smoke\processed\train_process.csv
+dev 预处理完成 -> D:\workspace_AI\workspace_traecode\xiangmu_traecode\Supply Chain NLP\data\smoke\processed\dev_process.csv
+D:\software_work\conda_envs\SupplyChainNLP\Lib\site-packages\sklearn\feature_extraction\text.py:412: UserWarning: Your 
+stop_words may be inconsistent with your preprocessing. Tokenizing the stop words generated tokens ['lex', '①①', '①②', 
+'①③', '①④', '①⑤', '①⑥', '①⑦', '①⑧', '①⑨', '①ａ', '①ｂ', '①ｃ', '①ｄ', '①ｅ', '①ｆ', '①ｇ', '①ｈ', '①ｉ', '①ｏ', '②①', '②②', '②③',
+ '②④', '②⑤', '②⑥', '②⑦', '②⑧', '②⑩', '②ａ', '②ｂ', '②ｄ', '②ｅ', '②ｆ', '②ｇ', '②ｈ', '②ｉ', '②ｊ', '③①', '③⑩', '③ａ', '③ｂ', '③ｃ'
+, '③ｄ', '③ｅ', '③ｆ', '③ｇ', '③ｈ', '④ａ', '④ｂ', '④ｃ', '④ｄ', '④ｅ', '⑤ａ', '⑤ｂ', '⑤ｄ', '⑤ｅ', '⑤ｆ', '１２', 'ｌｉ', 'ｚｘｆｉｔｌ'] not i
+n stop_words.
+  warnings.warn(
+随机森林基线（2000 条训练子集, TF-IDF+jieba）
+训练耗时: 0.2s
+Dev Acc: 0.8600
+Micro P/R/F1: 0.8600 / 0.8600 / 0.8600
+
+              precision    recall  f1-score   support
+
+        文件资料       0.90      0.88      0.89        40
+        服饰鞋帽       0.97      0.88      0.92        40
+        数码家电       0.90      0.93      0.91        40
+        食品生鲜       0.88      0.90      0.89        40
+        日用百货       0.74      0.88      0.80        40
+        美妆个护       0.86      0.62      0.72        40
+        医药健康       0.92      0.88      0.90        40
+         易碎品       0.88      0.88      0.88        40
+         违禁品       0.78      0.90      0.84        40
+          其他       0.81      0.88      0.84        40
+
+    accuracy                           0.86       400
+   macro avg       0.86      0.86      0.86       400
+weighted avg       0.86      0.86      0.86       400
+
+
+===== [冒烟] BERT 微调（小样本） =====
+
+Loading weights:   0%|          | 0/199 [00:00<?, ?it/s]
+Loading weights:  26%|██▌       | 51/199 [00:00<00:00, 485.15it/s]
+Loading weights:  53%|█████▎    | 105/199 [00:00<00:00, 503.67it/s]
+Loading weights: 100%|██████████| 199/199 [00:00<00:00, 702.32it/s]
+[transformers] [1mBertModel LOAD REPORT[0m from: D:\workspace_AI\workspace_traecode\xiangmu_traecode\Supply Chain NLP
+\models\bert-base-chinese
+Key                                        | Status     |  | 
+-------------------------------------------+------------+--+-
+cls.seq_relationship.bias                  | UNEXPECTED |  | 
+cls.predictions.transform.dense.bias       | UNEXPECTED |  | 
+cls.predictions.bias                       | UNEXPECTED |  | 
+cls.predictions.transform.dense.weight     | UNEXPECTED |  | 
+cls.predictions.transform.LayerNorm.weight | UNEXPECTED |  | 
+cls.seq_relationship.weight                | UNEXPECTED |  | 
+cls.predictions.transform.LayerNorm.bias   | UNEXPECTED |  | 
+
+Notes:
+- UNEXPECTED:	can be ignored when loading from different task/architecture; not ok if you expect identical arch.
+device=cuda, train batches=16
+
+BERT epoch 1/2:   0%|          | 0/16 [00:00<?, ?it/s]
+BERT epoch 1/2:   6%|▋         | 1/16 [00:00<00:08,  1.69it/s]
+BERT epoch 1/2:  12%|█▎        | 2/16 [00:00<00:04,  3.12it/s]
+BERT epoch 1/2:  19%|█▉        | 3/16 [00:00<00:03,  4.17it/s]
+BERT epoch 1/2:  25%|██▌       | 4/16 [00:00<00:02,  5.16it/s]
+BERT epoch 1/2:  31%|███▏      | 5/16 [00:01<00:01,  5.66it/s]
+BERT epoch 1/2:  38%|███▊      | 6/16 [00:01<00:01,  6.24it/s]
+BERT epoch 1/2:  44%|████▍     | 7/16 [00:01<00:01,  6.69it/s]
+BERT epoch 1/2:  50%|█████     | 8/16 [00:01<00:01,  6.88it/s]
+BERT epoch 1/2:  56%|█████▋    | 9/16 [00:01<00:01,  6.97it/s]
+BERT epoch 1/2:  62%|██████▎   | 10/16 [00:01<00:00,  6.92it/s]
+BERT epoch 1/2:  69%|██████▉   | 11/16 [00:01<00:00,  6.65it/s]
+BERT epoch 1/2:  75%|███████▌  | 12/16 [00:02<00:00,  6.87it/s]
+BERT epoch 1/2:  81%|████████▏ | 13/16 [00:02<00:00,  6.90it/s]
+BERT epoch 1/2:  88%|████████▊ | 14/16 [00:02<00:00,  7.14it/s]
+BERT epoch 1/2:  94%|█████████▍| 15/16 [00:02<00:00,  7.36it/s]
+BERT epoch 1/2: 100%|██████████| 16/16 [00:02<00:00,  7.82it/s]
+BERT epoch 1/2: 100%|██████████| 16/16 [00:02<00:00,  6.11it/s]
+
+Evaluating:   0%|          | 0/4 [00:00<?, ?it/s]
+Evaluating:  75%|███████▌  | 3/4 [00:00<00:00, 22.97it/s]
+Epoch 1: loss=1.9586 train_acc=0.3950 dev_acc=0.7325 dev_f1=0.7229 (3s)
+  保存最优模型 (dev_acc=0.7325) -> D:\workspace_AI\workspace_traecode\xiangmu_traecode\Supply Chain NLP\models\smoke\checkpoints\bert_best.pt
+                                                         
+
+BERT epoch 2/2:   0%|          | 0/16 [00:00<?, ?it/s]
+BERT epoch 2/2:   6%|▋         | 1/16 [00:00<00:02,  6.28it/s]
+BERT epoch 2/2:  12%|█▎        | 2/16 [00:00<00:02,  6.41it/s]
+BERT epoch 2/2:  19%|█▉        | 3/16 [00:00<00:01,  6.90it/s]
+BERT epoch 2/2:  25%|██▌       | 4/16 [00:00<00:01,  7.02it/s]
+BERT epoch 2/2:  31%|███▏      | 5/16 [00:00<00:01,  7.02it/s]
+BERT epoch 2/2:  38%|███▊      | 6/16 [00:00<00:01,  7.14it/s]
+BERT epoch 2/2:  44%|████▍     | 7/16 [00:01<00:01,  7.00it/s]
+BERT epoch 2/2:  50%|█████     | 8/16 [00:01<00:01,  6.92it/s]
+BERT epoch 2/2:  56%|█████▋    | 9/16 [00:01<00:01,  6.90it/s]
+BERT epoch 2/2:  62%|██████▎   | 10/16 [00:01<00:00,  7.04it/s]
+BERT epoch 2/2:  69%|██████▉   | 11/16 [00:01<00:00,  7.26it/s]
+BERT epoch 2/2:  75%|███████▌  | 12/16 [00:01<00:00,  7.17it/s]
+BERT epoch 2/2:  81%|████████▏ | 13/16 [00:01<00:00,  7.06it/s]
+BERT epoch 2/2:  88%|████████▊ | 14/16 [00:01<00:00,  7.21it/s]
+BERT epoch 2/2:  94%|█████████▍| 15/16 [00:02<00:00,  7.06it/s]
+BERT epoch 2/2: 100%|██████████| 16/16 [00:02<00:00,  7.16it/s]
+
+Evaluating:   0%|          | 0/4 [00:00<?, ?it/s]
+Evaluating:  75%|███████▌  | 3/4 [00:00<00:00, 22.76it/s]
+Epoch 2: loss=0.8171 train_acc=0.8425 dev_acc=0.8525 dev_f1=0.8591 (2s)
+  保存最优模型 (dev_acc=0.8525) -> D:\workspace_AI\workspace_traecode\xiangmu_traecode\Supply Chain NLP\models\smoke\checkpoints\bert_best.pt
+                                                         
+
+Evaluating:   0%|          | 0/4 [00:00<?, ?it/s]
+Evaluating:  75%|███████▌  | 3/4 [00:00<00:00, 21.34it/s]
+Test Acc: 0.8550  Macro F1: 0.8620  (评估 0s)
+              precision    recall  f1-score   support
+
+        文件资料     0.9459    0.8750    0.9091        40
+        服饰鞋帽     0.9706    0.8250    0.8919        40
+        数码家电     0.8718    0.8500    0.8608        40
+        食品生鲜     0.9714    0.8500    0.9067        40
+        日用百货     0.7750    0.7750    0.7750        40
+        美妆个护     1.0000    0.8750    0.9333        40
+        医药健康     0.9722    0.8750    0.9211        40
+         易碎品     1.0000    0.8750    0.9333        40
+         违禁品     0.7347    0.9000    0.8090        40
+          其他     0.5667    0.8500    0.6800        40
+
+    accuracy                         0.8550       400
+   macro avg     0.8808    0.8550    0.8620       400
+weighted avg     0.8808    0.8550    0.8620       400
+
+
+===== [冒烟] 知识蒸馏（软标签, 小样本） =====
+                                                         
+
+Loading weights:   0%|          | 0/199 [00:00<?, ?it/s]
+Loading weights:  15%|█▌        | 30/199 [00:00<00:00, 282.62it/s]
+Loading weights:  34%|███▍      | 68/199 [00:00<00:00, 335.47it/s]
+Loading weights:  51%|█████▏    | 102/199 [00:00<00:00, 316.98it/s]
+Loading weights: 100%|██████████| 199/199 [00:00<00:00, 608.23it/s]
+[transformers] [1mBertModel LOAD REPORT[0m from: D:\workspace_AI\workspace_traecode\xiangmu_traecode\Supply Chain NLP
+\models\bert-base-chinese
+Key                                        | Status     |  | 
+-------------------------------------------+------------+--+-
+cls.seq_relationship.bias                  | UNEXPECTED |  | 
+cls.predictions.transform.dense.bias       | UNEXPECTED |  | 
+cls.predictions.bias                       | UNEXPECTED |  | 
+cls.predictions.transform.dense.weight     | UNEXPECTED |  | 
+cls.predictions.transform.LayerNorm.weight | UNEXPECTED |  | 
+cls.seq_relationship.weight                | UNEXPECTED |  | 
+cls.predictions.transform.LayerNorm.bias   | UNEXPECTED |  | 
+
+Notes:
+- UNEXPECTED:	can be ignored when loading from different task/architecture; not ok if you expect identical arch.
+[蒸馏-soft] T=2.0, alpha=0.7, device=cuda, batches=16
+
+distill-soft epoch 1/2:   0%|          | 0/16 [00:00<?, ?it/s]
+distill-soft epoch 1/2:   6%|▋         | 1/16 [00:00<00:02,  6.50it/s]
+distill-soft epoch 1/2:  19%|█▉        | 3/16 [00:00<00:01, 12.89it/s]
+distill-soft epoch 1/2:  31%|███▏      | 5/16 [00:00<00:00, 15.53it/s]
+distill-soft epoch 1/2:  44%|████▍     | 7/16 [00:00<00:00, 16.71it/s]
+distill-soft epoch 1/2:  56%|█████▋    | 9/16 [00:00<00:00, 17.14it/s]
+distill-soft epoch 1/2:  75%|███████▌  | 12/16 [00:00<00:00, 18.58it/s]
+distill-soft epoch 1/2:  88%|████████▊ | 14/16 [00:00<00:00, 18.43it/s]
+  loss=2.0125 dev_acc=0.1000 (1s)
+                                                                       
+
+distill-soft epoch 2/2:   0%|          | 0/16 [00:00<?, ?it/s]
+distill-soft epoch 2/2:  19%|█▉        | 3/16 [00:00<00:00, 21.11it/s]
+distill-soft epoch 2/2:  38%|███▊      | 6/16 [00:00<00:00, 18.83it/s]
+distill-soft epoch 2/2:  50%|█████     | 8/16 [00:00<00:00, 19.15it/s]
+distill-soft epoch 2/2:  62%|██████▎   | 10/16 [00:00<00:00, 18.88it/s]
+distill-soft epoch 2/2:  75%|███████▌  | 12/16 [00:00<00:00, 19.18it/s]
+distill-soft epoch 2/2:  88%|████████▊ | 14/16 [00:00<00:00, 19.27it/s]
+  loss=1.9960 dev_acc=0.2125 (1s)
+蒸馏-soft: Test Acc=0.2050, 参数量=5,470,986（约20.9MB fp32 / checkpoint: D:\workspace_AI\workspace_traecode\xiangmu_traecode\Supply Chain NLP\models\smoke\checkpoints\distill_best_soft.pt）
+
+===== [冒烟] 动态量化 =====
+                                                                       
+
+Loading weights:   0%|          | 0/199 [00:00<?, ?it/s]
+Loading weights:  16%|█▌        | 31/199 [00:00<00:00, 284.19it/s]
+Loading weights:  35%|███▌      | 70/199 [00:00<00:00, 335.64it/s]
+Loading weights: 100%|██████████| 199/199 [00:00<00:00, 712.19it/s]
+[transformers] [1mBertModel LOAD REPORT[0m from: D:\workspace_AI\workspace_traecode\xiangmu_traecode\Supply Chain NLP
+\models\bert-base-chinese
+Key                                        | Status     |  | 
+-------------------------------------------+------------+--+-
+cls.seq_relationship.bias                  | UNEXPECTED |  | 
+cls.predictions.transform.dense.bias       | UNEXPECTED |  | 
+cls.predictions.bias                       | UNEXPECTED |  | 
+cls.predictions.transform.dense.weight     | UNEXPECTED |  | 
+cls.predictions.transform.LayerNorm.weight | UNEXPECTED |  | 
+cls.seq_relationship.weight                | UNEXPECTED |  | 
+cls.predictions.transform.LayerNorm.bias   | UNEXPECTED |  | 
+
+Notes:
+- UNEXPECTED:	can be ignored when loading from different task/architecture; not ok if you expect identical arch.
+
+Evaluating:   0%|          | 0/4 [00:00<?, ?it/s]
+Evaluating:  25%|██▌       | 1/4 [00:00<00:00,  5.02it/s]
+Evaluating:  50%|█████     | 2/4 [00:00<00:00,  5.09it/s]
+Evaluating:  75%|███████▌  | 3/4 [00:00<00:00,  4.87it/s]
+动态量化(int8, Linear) Test Acc=0.8600, Macro F1=0.8662
+模型体积: fp32 390.2MB -> int8 145.6MB
+量化模型: D:\workspace_AI\workspace_traecode\xiangmu_traecode\Supply Chain NLP\models\smoke\checkpoints\bert_best_int8.pt
+              precision    recall  f1-score   support
+
+        文件资料     0.9459    0.8750    0.9091        40
+        服饰鞋帽     1.0000    0.7750    0.8732        40
+        数码家电     0.7955    0.8750    0.8333        40
+        食品生鲜     0.9722    0.8750    0.9211        40
+        日用百货     0.9118    0.7750    0.8378        40
+        美妆个护     0.9722    0.8750    0.9211        40
+        医药健康     1.0000    0.8750    0.9333        40
+         易碎品     1.0000    0.8750    0.9333        40
+         违禁品     0.6786    0.9500    0.7917        40
+          其他     0.6071    0.8500    0.7083        40
+
+    accuracy                         0.8600       400
+   macro avg     0.8883    0.8600    0.8662       400
+weighted avg     0.8883    0.8600    0.8662       400
+
+
+===== [冒烟] FastAPI 推理函数（进程内） =====
+[{'text': '寄两份合同文件', 'class_index': 0, 'class_name': '文件资料', 'prob': 0.9994, 'needs_human_review': False, 'review_reason': ''}, {'text': '一箱东西', 'class_index': 5, 'class_name': '美妆个护', 'prob': 0.1332, 'needs_human_review': True, 'review_reason': '置信度0.13低于阈值0.6，转人工复核'}]
+
+冒烟通过：6/6 -> ['数据生成（小样本, data/smoke）', 'RF 基线', 'BERT 微调（小样本）', '知识蒸馏（软标签, 小样本）', '动态量化', 'FastAPI 推理函数（进程内）']
+                                                         

@@ -1,0 +1,104 @@
+# -*- coding: utf-8 -*-
+"""知识蒸馏：软标签（KL·T²，T=2.0, α=0.7）/ 硬标签 / 中间层（MSE）三种方式训练 BiLSTM 学生。"""
+import os
+import sys
+import time
+
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, PROJECT_ROOT)
+import torch  # noqa: E402
+import torch.nn as nn  # noqa: E402
+import torch.nn.functional as F  # noqa: E402
+from sklearn.metrics import accuracy_score  # noqa: E402
+from torch.optim import AdamW  # noqa: E402
+from tqdm import tqdm  # noqa: E402
+from transformers import BertConfig  # noqa: E402
+from config.config import Config  # noqa: E402
+from src.compress.bilstm import BiLSTMClassifier  # noqa: E402
+from src.bert_model.bert_pipeline import BertClassifier, build_loaders, evaluate  # noqa: E402
+
+
+@torch.no_grad()
+def evaluate_student(model, loader, conf, device=None):
+    device = device or conf.device
+    model.eval()
+    preds, labels = [], []
+    for input_ids, attention_mask, y in loader:
+        input_ids, attention_mask, y = (input_ids.to(device), attention_mask.to(device), y.to(device))
+        logits = model(input_ids, attention_mask)
+        preds.extend(torch.argmax(logits, dim=1).cpu().numpy())
+        labels.extend(y.cpu().numpy())
+    return accuracy_score(labels, preds)
+
+
+def distill(conf: Config, mode: str = "soft", limit: int | None = None):
+    """mode: soft(软标签) / hard(硬标签) / intermediate(中间层)"""
+    assert mode in ("soft", "hard", "intermediate")
+    train_loader, dev_loader, test_loader = build_loaders(conf, limit=limit)
+
+    teacher = BertClassifier(conf).to(conf.device)
+    teacher.load_state_dict(torch.load(conf.model_save_path, map_location=conf.device))
+    teacher.eval()
+    for p in teacher.parameters():
+        p.requires_grad_(False)
+
+    student = BiLSTMClassifier(conf).to(conf.device)
+    optimizer = AdamW(student.parameters(), lr=1e-3)
+    ce = nn.CrossEntropyLoss()
+    T, alpha = conf.distill_T, conf.distill_alpha
+    save_path = conf.student_save_path.replace(".pt", f"_{mode}.pt")
+
+    print(f"[蒸馏-{mode}] T={T}, alpha={alpha}, device={conf.device}, "
+          f"batches={len(train_loader)}")
+    for epoch in range(conf.num_epochs):
+        student.train()
+        total_loss = 0.0
+        t0 = time.time()
+        for input_ids, attention_mask, y in tqdm(
+                train_loader, desc=f"distill-{mode} epoch {epoch + 1}/{conf.num_epochs}", leave=False):
+            input_ids, attention_mask, y = (input_ids.to(conf.device),
+                                            attention_mask.to(conf.device), y.to(conf.device))
+            optimizer.zero_grad()
+            with torch.no_grad():
+                t_logits, t_hidden = teacher.forward_hidden(input_ids, attention_mask)
+            if mode == "soft":
+                s_logits = student(input_ids, attention_mask)
+                soft_loss = F.kl_div(F.log_softmax(s_logits / T, dim=1),
+                                     F.softmax(t_logits / T, dim=1),
+                                     reduction="batchmean") * (T * T)
+                loss = alpha * soft_loss + (1 - alpha) * ce(s_logits, y)
+            elif mode == "hard":
+                s_logits = student(input_ids, attention_mask)
+                hard_target = torch.argmax(t_logits, dim=1)
+                loss = ce(s_logits, hard_target)
+            else:  # intermediate
+                s_logits, s_hidden = student(input_ids, attention_mask, return_hidden=True)
+                loss = alpha * F.mse_loss(s_hidden, t_hidden) + (1 - alpha) * ce(s_logits, y)
+            loss.backward()
+            optimizer.step()
+            total_loss += loss.item()
+
+        dev_acc = evaluate_student(student, dev_loader, conf)
+        print(f"  loss={total_loss / len(train_loader):.4f} dev_acc={dev_acc:.4f} ({time.time() - t0:.0f}s)")
+        torch.save(student.state_dict(), save_path)
+
+    test_acc = evaluate_student(student, test_loader, conf)
+    n_params = sum(p.numel() for p in student.parameters())
+    size_mb = n_params * 4 / 1024 / 1024
+    summary = (f"蒸馏-{mode}: Test Acc={test_acc:.4f}, "
+               f"参数量={n_params:,}（约{size_mb:.1f}MB fp32 / checkpoint: {save_path}）")
+    print(summary)
+    return test_acc, summary
+
+
+if __name__ == "__main__":
+    conf = Config()
+    conf.bert_config = BertConfig.from_pretrained(conf.pretrain_bert_dir)
+    results = []
+    for mode in ["soft", "hard", "intermediate"]:
+        results.append(distill(conf, mode=mode)[1])
+    out = os.path.join(PROJECT_ROOT, "experiments", "distill.md")
+    os.makedirs(os.path.dirname(out), exist_ok=True)
+    with open(out, "w", encoding="utf-8") as f:
+        f.write("# 知识蒸馏实验（教师 BERT -> 学生 BiLSTM）\n\n```\n" + "\n".join(results) + "\n```\n")
+    print(f"已保存 -> {out}")

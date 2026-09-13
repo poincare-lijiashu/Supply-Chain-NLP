@@ -1,0 +1,27 @@
+# 模型权重与数据
+models/checkpoints/
+models/fasttext/
+models/baseline_rf/
+models/smoke/
+data/raw/
+data/processed/
+data/smoke/
+models/bert-base-chinese/
+!models/bert-base-chinese/config.json
+!models/bert-base-chinese/vocab.txt
+!models/bert-base-chinese/tokenizer*
+
+# 实验日志（.md 记录保留）
+experiments/*.log
+
+# 密钥与配置
+.env
+
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+*.egg-info/
+
+# 实验产物（图表）
+experiments/*.png
