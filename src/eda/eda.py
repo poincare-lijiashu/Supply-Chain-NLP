@@ -1,17 +1,17 @@
 # -*- coding: utf-8 -*-
 """数据探索分析：类目分布、文本长度统计（确定截断长度依据）。结果落盘 experiments/。"""
 import os
-import sys
 from collections import Counter
 
-PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-sys.path.insert(0, PROJECT_ROOT)
-import pandas as pd  # noqa: E402
-import matplotlib  # noqa: E402
+import matplotlib
+import pandas as pd
 
 matplotlib.use("Agg")
-import matplotlib.pyplot as plt  # noqa: E402
-from config.config import Config  # noqa: E402
+import matplotlib.pyplot as plt  # noqa: E402  （matplotlib 必须先设定后端再引 pyplot）
+
+from config.config import Config
+
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 plt.rcParams["font.sans-serif"] = ["Microsoft YaHei", "SimHei"]
 plt.rcParams["axes.unicode_minus"] = False

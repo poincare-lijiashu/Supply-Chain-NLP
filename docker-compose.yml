@@ -5,12 +5,13 @@
 # 水平扩容：    docker compose --profile lb up -d --scale api=4
 services:
   api:
-    image: supply-chain-nlp:1.0.0
+    image: supply-chain-nlp:1.2.0
     build:
       context: .
       dockerfile: Dockerfile
     environment:
       MODEL_NAME: distill     # distill | bert_int8 | bert
+      API_AUTH_KEY: ${API_AUTH_KEY:-}   # 设置后 /predict 需带 X-API-Key 请求头（.env 提供）
     restart: unless-stopped
     expose:
       - "8004"                # 仅容器网络内可见（无固定宿主端口，扩容不冲突）

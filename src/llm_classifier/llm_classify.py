@@ -1,16 +1,17 @@
 # -*- coding: utf-8 -*-
 """LLM 分类对照实验：DeepSeek API + few-shot 提示词 + JSON 输出 + 重试。
-讲义口径：小样本评估，验证「LLM 准确率低于微调 BERT 且成本高」的选型论证。"""
+小样本评估：验证「LLM 准确率低于微调 BERT 且单条成本/延迟高」的选型论证。"""
 import json
 import os
 import sys
 import time
 
+from dotenv import load_dotenv
+from tenacity import retry, stop_after_attempt, wait_fixed
+
+from config.config import Config
+
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-sys.path.insert(0, PROJECT_ROOT)
-from dotenv import load_dotenv  # noqa: E402
-from tenacity import retry, stop_after_attempt, wait_fixed  # noqa: E402
-from config.config import Config  # noqa: E402
 
 load_dotenv(os.path.join(PROJECT_ROOT, ".env"))
 

@@ -14,37 +14,102 @@
 - **违禁品红线策略**：高风险类目 + 低置信度样本自动转人工复核
 - 行业对标：顺丰丰语大模型（寄件意图识别）、货拉拉（司机侧违禁品识别）、快递100（一句话寄快递）、京东物流（地址解析）
 
-## 2. 数据
+## 2. 系统架构
+
+```mermaid
+flowchart LR
+    subgraph 数据层
+        GEN["托寄物文本合成器<br/>18w 训练 / 1w 验证 / 1w 测试<br/>含易混样本与分布漂移"]
+        CLASS["class.txt<br/>10 类目体系"]
+    end
+    subgraph 训练管线
+        BASE["① 基线<br/>TF-IDF + 随机森林"]
+        FT["② fastText<br/>字/词级 × autotune"]
+        BERT["③ BERT 微调<br/>bert-base-chinese"]
+        COMP["④ 模型压缩<br/>int8 量化 · 知识蒸馏<br/>L1 剪枝"]
+    end
+    subgraph 推理服务
+        API["FastAPI /predict<br/>单例模型 · 鉴权 · 限流<br/>入参上限"]
+        FRONT["前端工作台<br/>批量输入 · 置信度可视化"]
+        HUMAN["人工复核队列<br/>低置信度 / 违禁品红线"]
+    end
+    LLM["LLM 对照实验<br/>DeepSeek few-shot<br/>（选型论证）"]
+
+    GEN --> BASE --> FT --> BERT --> COMP --> API
+    CLASS --> GEN
+    LLM -. 选型对照 .-> BERT
+    API --> FRONT
+    API -- "needs_human_review" --> HUMAN
+    HUMAN -. 补充标注回流 .-> GEN
+```
+
+**设计要点**
+
+- **模型升级有据**：基线 → fastText → BERT 逐级对照，每级都有真实实验记录，压缩手段（量化/蒸馏/剪枝）量化对比后择优上线
+- **红线兜底**：违禁品类目 + 低置信度样本强制转人工——模型错分的代价被流程吸收，而非依赖模型 100% 正确
+- **无状态服务**：权重打进镜像，水平扩容只加副本；训练与推理完全分离
+
+## 3. 数据
+
+> **数据口径声明**：仓库内置数据为**按真实业务分布合成的演示数据**（[data/generate_data.py](data/generate_data.py)
+> 固定随机种子生成，含噪声与易混样本），保证公开可复现、不含任何真实运单与个人信息。
+> 下表"生产口径"描述真实接入时的数据形态；本仓库全部指标均在合成数据上复现（见 [experiments/](experiments/)）。
 
 | 数据集 | 规模 | 说明 |
 |---|---|---|
-| 训练集 | 180,000 | 历史运单托寄物描述+备注，脱敏后按标注规范标定，10 类均衡（1.8w/类） |
+| 训练集 | 180,000 | 合成托寄物描述+备注，10 类均衡（1.8w/类）；生产口径为脱敏历史运单按标注规范标定 |
 | 验证集 | 10,000 | 按验证集效果保存最优权重 |
-| 测试集 | 10,000 | 人工精标，含少量标注噪声（通过混淆矩阵发现并修正） |
+| 测试集 | 10,000 | 合成含少量标注噪声（通过混淆矩阵发现并修正）；生产口径为人工精标 |
 
 - 格式：`文本\t类目编号`（与 `data/class.txt` 行号对应），短文本（P95 长度 ≈ 11 字符，BERT 截断长度 32）
-- 数据合成与分布说明见 [data/generate_data.py](data/generate_data.py) 与 [experiments/eda_report.md](experiments/eda_report.md)
+- 分布说明见 [data/generate_data.py](data/generate_data.py) 与 [experiments/eda_report.md](experiments/eda_report.md)
 
-## 3. 模型升级路径与成果（验收口径）
+## 4. 模型升级路径与成果（实测）
 
-| 阶段 | 方案 | 关键参数 | 指标 | 结论 |
+| 阶段 | 方案 | 关键参数 | 测试集准确率 | 结论 |
 |---|---|---|---|---|
-| 基线 | TF-IDF + 随机森林 | jieba 取前30词，2万条子集 | **84.3%** | 数据可分、任务可行 |
-| 快速模型 | fastText（字/词 × 默认/自动调参300s） | 层次softmax，wordNgrams | **91.7%**，单条 ~5ms | CPU 毫秒级，性价比高 |
-| 主模型 | BERT 微调 | bert-base-chinese + 全连接层，AdamW lr=5e-5，batch=128，交叉熵 | **93.64%**，409MB，~200ms/条 | 效果最优，直接上线成本高 |
-| 压缩① | 动态量化 int8 | quantize_dynamic({Linear}) | 体积缩至约 1/3，精度微降 | 验证数值鲁棒性 |
-| 压缩② | 知识蒸馏 | 教师 BERT → 学生 BiLSTM(128/256/2层)，KL·T²(T=2.0) + CE，α=0.7 | **91.25%**，23.1MB（约17×），推理提速约 **13×** | **最终上线口径** |
-| 可选 | L1 非结构化剪枝 30% | encoder.query 权重 | 精度缓降，稀疏度 0.3 | 压缩手段对照 |
+| 基线 | TF-IDF + 随机森林 | jieba 取前30词，2万条子集 | **94.98%** | 数据可分、任务可行 |
+| 快速模型 | fastText（字/词 × 默认/autotune300s） | 层次softmax，wordNgrams | **96.44%**，单条 ~0.01ms | CPU 毫秒级，性价比高 |
+| 主模型 | BERT 微调 | bert-base-chinese + 全连接层，AdamW lr=5e-5，batch=128，4 epochs | **96.38%**，Macro F1 0.9660 | 与 fastText 趋同（见下注），397MB |
+| 压缩① | 动态量化 int8 | quantize_dynamic({Linear}) | **96.37%**，390→146MB（2.68×） | 精度几乎无损 |
+| 压缩② | 知识蒸馏 | 教师 BERT → 学生 BiLSTM(128/256/2层)，KL·T²(T=2.0) + CE，α=0.7 | **96.37%**，20.9MB（约 **19×**），CPU 推理 **1.3ms**（约 **12×**） | **最终上线口径** |
+| 可选 | L1 非结构化剪枝 30% | encoder.query 权重 | 96.40% → 96.40%，稀疏度 0.30 | 近乎无损 |
 
-**上线成果**
-1. 蒸馏模型准确率 91.25%，与 BERT（93.64%）仅差 2.39%，满足寄件初审要求
-2. 单条预测 200ms → **15ms 左右**，模型 23.1MB，普通 CPU 服务器即可部署
-3. 替代人工约 **80%** 的寄件初审分类工作，制单环节平均耗时缩短约 **20%**，违禁品漏检率明显下降
+> **为何基线与 BERT 趋同，仍选 BERT+蒸馏上线？** 仓库数据为合成基准，模板化程度高于真实运单，
+> 词面特征（TF-IDF/fastText）已接近该数据分布的可学习上限；真实业务文本（口语化、错字、多物品混填）
+> 词面基线会显著衰减，BERT 字级泛化优势将放大——初版通用新闻分类基准上的对照实验
+> （RF 73.1% vs BERT 93.3%）印证了这一梯度。详见 [experiments/real_run.md](experiments/real_run.md)。
 
-> 指标口径说明：上表为项目验收/简历口径。在本机复现的真实实验记录（含环境与种子）见
-> [experiments/](experiments/)（`baseline_rf.md` / `fasttext.md` / `bert.md` / `distill.md` / `compress.md` / `real_run.md`）。
+**上线成果（蒸馏 BiLSTM）**
 
-## 4. 快速开始
+1. 测试集准确率 **96.37%**，与教师 BERT（96.38%）几乎无损；歧义/违禁品风险由置信度阈值 + 人工复核兜底
+2. 模型 **20.9MB**（教师约 1/19），CPU 单条 **~1.3ms**，普通 CPU 服务器即可部署
+3. 违禁品红线 + 低置信度自动转人工，替代人工完成寄件初审的分类环节
+
+### 效果可视化
+
+**前端工作台**（批量输入 / 10 类置信度 / 红线与低置信度自动标记）：
+
+![前端工作台](docs/img/workbench.png)
+
+**模型升级阶梯与压缩收益**：
+
+| 测试集准确率阶梯 | CPU 推理延迟对比 |
+|---|---|
+| ![模型阶梯](docs/img/model_stairs.png) | ![延迟对比](docs/img/latency.png) |
+
+**测试集混淆矩阵**（左：教师 BERT；右：上线蒸馏模型——两类模型错误分布一致，验证蒸馏保真）：
+
+| 教师 BERT | 蒸馏 BiLSTM（上线） |
+|---|---|
+| ![BERT 混淆矩阵](docs/img/bert_confusion_matrix.png) | ![蒸馏混淆矩阵](docs/img/distill_confusion_matrix.png) |
+
+> 图表由 `python -m scripts.make_charts` 生成，数据同源 [experiments/real_run.md](experiments/real_run.md)。
+
+> 指标口径说明：上表为全量数据（seed=2026）在本机的实测结果，环境、训练曲线与复现方法见
+> [experiments/real_run.md](experiments/real_run.md)；各阶段记录：`baseline_rf.md` / `fasttext.md` / `bert.md` / `distill.md` / `compress.md`。
+
+## 5. 快速开始
 
 ```bash
 # 1) 环境（Python 3.11）
@@ -55,18 +120,21 @@ pip install -r requirements.txt
 #    （config.json / vocab.txt / tokenizer*.json / model.safetensors）
 
 # 3) 数据（合成数据生成器，18w/1w/1w）
-python data/generate_data.py
+python -m data.generate_data
 
-# 4) 全管线（或分步运行）
-python src/eda/eda.py                        # 数据探索
-python src/baseline_rf/rf_baseline.py        # 基线
-python src/fasttext_model/fasttext_runner.py # fastText 四组实验
-python src/bert_model/bert_pipeline.py       # BERT 微调 + 测试报告/混淆矩阵
-python src/compress/distill.py               # 三种蒸馏
-python src/compress/quantize_prune.py        # 量化/剪枝/延迟基准
+# 4) 全管线（或分步运行；均在项目根目录以 -m 方式执行）
+python -m src.eda.eda                          # 数据探索
+python -m src.baseline_rf.rf_baseline          # 基线
+python -m src.fasttext_model.fasttext_runner   # fastText 四组实验
+python -m src.bert_model.bert_pipeline         # BERT 微调 + 测试报告/混淆矩阵
+python -m src.compress.distill                 # 三种蒸馏
+python -m src.compress.quantize_prune          # 量化/剪枝/延迟基准
 ```
 
-## 5. 部署（FastAPI + Docker）
+> 所有入口均以 `python -m` 模块方式执行（项目根目录），无需配置 PYTHONPATH；
+> 也可 `pip install -e .` 后在任意目录调用。
+
+## 6. 部署（FastAPI + Docker）
 
 **方式一：Docker（推荐，脱离本机环境）**
 
@@ -81,8 +149,9 @@ docker compose up -d --scale api=3   # 无状态服务，水平扩容（前置 N
 **方式二：本机运行**
 
 ```bash
-uvicorn src.serving.app:app --host 0.0.0.0 --port 8004     # 默认加载蒸馏模型
+uvicorn src.serving.app:app --host 127.0.0.1 --port 8004    # 默认加载蒸馏模型（仅本机监听）
 MODEL_NAME=bert_int8 uvicorn src.serving.app:app --port 8004  # 或 int8 量化模型
+API_AUTH_KEY=my-secret uvicorn src.serving.app:app --port 8004  # 开启鉴权：/predict 需带 X-API-Key
 ```
 
 **前端工作台**：浏览器打开服务根路径（容器 `http://localhost:18004/`），支持批量输入、
@@ -91,10 +160,18 @@ MODEL_NAME=bert_int8 uvicorn src.serving.app:app --port 8004  # 或 int8 量化�
 **API**：
 
 ```bash
-python src/serving/client.py    # 测试客户端（单条+批量+转人工标记）
+python -m src.serving.client    # 部署验证客户端（单条+批量+转人工标记）
 # POST /predict {"texts": "寄两份合同文件"} 或 {"texts": ["...", "..."]}
 # 返回: class_index / class_name / prob / probs(全类目) / needs_human_review / review_reason
 ```
+
+**服务安全设计**（详见 [docs/DEPLOY.md](docs/DEPLOY.md)）：
+
+- **鉴权**：设置环境变量 `API_AUTH_KEY` 后，`/predict` 要求请求头 `X-API-Key` 恒时比较匹配（`/health` 不鉴权保证探活）；留空为本机开放模式
+- **限流**：内存滑动窗口，每客户端每分钟 60 次（`config.py: api_rate_limit_per_min`），超限返回 429
+- **入参上限**：单次 ≤100 条、单条 ≤512 字符，超限返回 400——防止恶意大请求打爆推理资源
+- **权重反序列化**：所有 `torch.load` 显式 `weights_only=True`，仅允许张量容器，杜绝 pickle 反序列化代码执行
+- **容器加固**：Dockerfile 非 root 用户（uid 10001）运行；Nginx 层统一注入安全响应头（CSP/X-Frame-Options/nosniff）
 
 **置信度阈值策略**：`prob < 0.60` 或命中「违禁品」类目时返回 `needs_human_review=true`，
 转人工复核——宁可多问一句，不让红线件漏过。
@@ -104,14 +181,14 @@ python src/serving/client.py    # 测试客户端（单条+批量+转人工标�
 （compose --scale 或 K8s Deployment + HPA），负载均衡交给 Nginx/网关；进一步优化可换 ONNX Runtime
 或批处理队列（吞吐优先场景）。
 
-## 6. LLM 对照实验（选型论证）
+## 7. LLM 对照实验（选型论证）
 
 [src/llm_classifier/llm_classify.py](src/llm_classifier/llm_classify.py)：DeepSeek API +
 few-shot 提示词（角色设定/类目关键词与示例/优先规则/JSON 输出/重试）对小样本评测。
 结论：LLM 方案准确率低于微调 BERT 且单条成本、延迟显著更高，定位为兜底与数据标注辅助，
 主链路选择「BERT 微调 + 蒸馏压缩」。（运行前复制 `.env.example` 为 `.env` 填入 API Key）
 
-## 7. 目录结构
+## 8. 目录结构
 
 ```
 Supply Chain NLP/
@@ -131,13 +208,16 @@ Supply Chain NLP/
 ├── web/                           # 前端工作台（纯静态，无 CDN 依赖）
 ├── experiments/                   # 真实复现实验记录（诚实留痕）
 ├── scripts/run_smoke.py           # 全链路冒烟测试
-├── docs/                          # 集成指南 / 发布清单 / 修复与对照留档
-├── Dockerfile / docker-compose.yml
-└── tests/                         # pytest 冒烟
+├── docs/                          # 部署指南 / Java 集成 / 发布清单 / 修复留档
+├── Dockerfile / docker-compose.yml / nginx/
+├── pyproject.toml / LICENSE       # 包元数据（pip install -e .）与开源协议
+└── tests/                         # pytest（核心算法单测 + 数据/配置）
 ```
 
-## 8. 工程说明
+## 9. 工程说明
 
-- 课程原始代码的已知缺陷已在改写中修复并留档：见 [docs/fix_log.md](docs/fix_log.md)
+- 项目迭代中的关键缺陷修复均有留档：见 [docs/fix_log.md](docs/fix_log.md)
 - 真实密钥不入库：`.env` 已 gitignore，仓库只含 `.env.example`
 - 固定随机种子（数据 seed=2026），`thread=1` 保证 fastText autotune 可复现
+- 标准化包结构（`pyproject.toml`，支持 `pip install -e .`），所有入口 `python -m` 执行
+- 测试分层：`tests/test_core.py`（蒸馏损失/复核判定/入参校验/模型前向，纯函数级）+ `tests/test_smoke.py`（数据/配置）+ `scripts/run_smoke.py`（全链路冒烟，产物隔离到 `data/smoke` 与 `models/smoke`）

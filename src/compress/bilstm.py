@@ -1,13 +1,9 @@
 # -*- coding: utf-8 -*-
-"""学生模型：BiLSTM（embed=128, hidden=256, 2层），结构与讲义口径一致。"""
-import os
-import sys
+"""学生模型：BiLSTM（embed=128, hidden=256, 2层双向），参数量约为教师的 1/18。"""
+import torch
+import torch.nn as nn
 
-PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-sys.path.insert(0, PROJECT_ROOT)
-import torch  # noqa: E402
-import torch.nn as nn  # noqa: E402
-from config.config import Config  # noqa: E402
+from config.config import Config
 
 
 class BiLSTMClassifier(nn.Module):

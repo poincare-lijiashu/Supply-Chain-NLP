@@ -1,13 +1,10 @@
 # -*- coding: utf-8 -*-
 """轻量测试：数据格式与配置一致性（不依赖模型权重）。"""
 import os
-import sys
 
 import pytest
 
-PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, PROJECT_ROOT)
-from config.config import Config  # noqa: E402
+from config.config import Config
 
 
 @pytest.fixture(scope="module")
@@ -44,4 +41,4 @@ def test_config_paths(conf):
 
 def test_distill_hparams(conf):
     assert conf.distill_T == 2.0 and conf.distill_alpha == 0.7
-    assert conf.learning_rate == 5e-5 and conf.num_epochs == 2
+    assert conf.learning_rate == 5e-5 and conf.num_epochs == 4

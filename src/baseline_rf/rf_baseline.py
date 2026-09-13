@@ -1,19 +1,19 @@
 # -*- coding: utf-8 -*-
-"""RF 基线：jieba 分词 -> CSV；TF-IDF + RandomForest；评估。讲义口径：基线取 2 万条验证可行性。"""
+"""RF 基线：jieba 分词 -> CSV；TF-IDF + RandomForest；评估。基线取 2 万条子集验证任务可行性与数据可分性。"""
 import os
 import pickle
-import sys
 import time
 
-PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-sys.path.insert(0, PROJECT_ROOT)
-import jieba  # noqa: E402
-import pandas as pd  # noqa: E402
-from sklearn.ensemble import RandomForestClassifier  # noqa: E402
-from sklearn.feature_extraction.text import TfidfVectorizer  # noqa: E402
-from sklearn.metrics import (accuracy_score, classification_report,  # noqa: E402
+import jieba
+import pandas as pd
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics import (accuracy_score, classification_report,
                              f1_score, precision_score, recall_score)
-from config.config import Config  # noqa: E402
+
+from config.config import Config
+
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
 def cut(text: str, max_words: int = 30) -> str:

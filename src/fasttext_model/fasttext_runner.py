@@ -1,14 +1,14 @@
 # -*- coding: utf-8 -*-
 """fasttext 模块：字级/词级 × 默认/自动调参，评估并计时。"""
 import os
-import sys
 import time
 
+import fasttext
+import jieba
+
+from config.config import Config
+
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-sys.path.insert(0, PROJECT_ROOT)
-import fasttext  # noqa: E402
-import jieba  # noqa: E402
-from config.config import Config  # noqa: E402
 
 fasttext.FastText.eprint = lambda x: None  # 关闭 fasttext 噪声日志
 

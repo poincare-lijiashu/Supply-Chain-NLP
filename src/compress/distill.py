@@ -1,21 +1,31 @@
 # -*- coding: utf-8 -*-
 """知识蒸馏：软标签（KL·T²，T=2.0, α=0.7）/ 硬标签 / 中间层（MSE）三种方式训练 BiLSTM 学生。"""
 import os
-import sys
 import time
 
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+from sklearn.metrics import accuracy_score
+from torch.optim import AdamW
+from tqdm import tqdm
+from transformers import BertConfig
+
+from config.config import Config
+from src.bert_model.bert_pipeline import BertClassifier, build_loaders, evaluate
+from src.compress.bilstm import BiLSTMClassifier
+
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-sys.path.insert(0, PROJECT_ROOT)
-import torch  # noqa: E402
-import torch.nn as nn  # noqa: E402
-import torch.nn.functional as F  # noqa: E402
-from sklearn.metrics import accuracy_score  # noqa: E402
-from torch.optim import AdamW  # noqa: E402
-from tqdm import tqdm  # noqa: E402
-from transformers import BertConfig  # noqa: E402
-from config.config import Config  # noqa: E402
-from src.compress.bilstm import BiLSTMClassifier  # noqa: E402
-from src.bert_model.bert_pipeline import BertClassifier, build_loaders, evaluate  # noqa: E402
+
+
+def soft_distill_loss(s_logits: torch.Tensor, t_logits: torch.Tensor, y: torch.Tensor,
+                      T: float, alpha: float, ce: nn.Module | None = None) -> torch.Tensor:
+    """软标签蒸馏损失（纯函数，便于单测）：α·KL(softmax(s/T)‖softmax(t/T))·T² + (1-α)·CE(s, y)。"""
+    ce = ce if ce is not None else nn.CrossEntropyLoss()
+    soft = F.kl_div(F.log_softmax(s_logits / T, dim=1),
+                    F.softmax(t_logits / T, dim=1),
+                    reduction="batchmean") * (T * T)
+    return alpha * soft + (1 - alpha) * ce(s_logits, y)
 
 
 @torch.no_grad()
@@ -37,7 +47,8 @@ def distill(conf: Config, mode: str = "soft", limit: int | None = None):
     train_loader, dev_loader, test_loader = build_loaders(conf, limit=limit)
 
     teacher = BertClassifier(conf).to(conf.device)
-    teacher.load_state_dict(torch.load(conf.model_save_path, map_location=conf.device))
+    teacher.load_state_dict(torch.load(conf.model_save_path, map_location=conf.device,
+                                       weights_only=True))
     teacher.eval()
     for p in teacher.parameters():
         p.requires_grad_(False)
@@ -63,10 +74,7 @@ def distill(conf: Config, mode: str = "soft", limit: int | None = None):
                 t_logits, t_hidden = teacher.forward_hidden(input_ids, attention_mask)
             if mode == "soft":
                 s_logits = student(input_ids, attention_mask)
-                soft_loss = F.kl_div(F.log_softmax(s_logits / T, dim=1),
-                                     F.softmax(t_logits / T, dim=1),
-                                     reduction="batchmean") * (T * T)
-                loss = alpha * soft_loss + (1 - alpha) * ce(s_logits, y)
+                loss = soft_distill_loss(s_logits, t_logits, y, T, alpha, ce)
             elif mode == "hard":
                 s_logits = student(input_ids, attention_mask)
                 hard_target = torch.argmax(t_logits, dim=1)

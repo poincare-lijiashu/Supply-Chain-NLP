@@ -1,16 +1,17 @@
 # -*- coding: utf-8 -*-
 """冒烟测试：小样本跑通「数据 -> RF -> fasttext -> BERT -> 蒸馏 -> 量化 -> 服务推理」全链路。
-用法：python scripts/run_smoke.py   （每模块 2000 条训练，几分钟内完成，CPU 也能跑）"""
+用法：python -m scripts.run_smoke   （项目根目录执行；每模块 2000 条训练，几分钟内完成，CPU 也能跑）"""
 import os
 import subprocess
 import sys
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, PROJECT_ROOT)
 from config.config import Config  # noqa: E402
 
 conf = Config()
 SMOKE = 2000
+SMOKE_BATCH = int(os.getenv("SMOKE_BATCH", "128"))  # 内存紧张时可 SMOKE_BATCH=32 降低峰值占用
+conf.batch_size = SMOKE_BATCH
 SMOKE_DIR = os.path.join(PROJECT_ROOT, "data", "smoke")
 ok = []
 
@@ -22,10 +23,9 @@ def step(name, fn):
 
 
 def _gen():
-    r = subprocess.run([sys.executable,
-                        os.path.join(PROJECT_ROOT, "data", "generate_data.py"),
+    r = subprocess.run([sys.executable, "-m", "data.generate_data",
                         "--train", str(SMOKE), "--dev", "400", "--test", "400",
-                        "--outdir", SMOKE_DIR], check=False)
+                        "--outdir", SMOKE_DIR], check=False, cwd=PROJECT_ROOT)
     if r.returncode != 0:
         raise RuntimeError("generate fail")
 
@@ -48,8 +48,6 @@ conf.train_ft_jieba_path = os.path.join(SMOKE_DIR, "fasttext", "train_ft_jieba.t
 conf.dev_ft_jieba_path = os.path.join(SMOKE_DIR, "fasttext", "dev_ft_jieba.txt")
 conf.test_ft_jieba_path = os.path.join(SMOKE_DIR, "fasttext", "test_ft_jieba.txt")
 # 模型产物也全部隔离到 models/smoke/，绝不覆盖正式权重
-import config.config as cfg_mod  # noqa: E402
-
 conf.rf_model_dir = os.path.join(PROJECT_ROOT, "models", "smoke", "baseline_rf")
 conf.ft_model_dir = os.path.join(PROJECT_ROOT, "models", "smoke", "fasttext")
 conf.model_save_dir = os.path.join(PROJECT_ROOT, "models", "smoke", "checkpoints")

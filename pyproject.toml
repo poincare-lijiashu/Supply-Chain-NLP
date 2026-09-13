@@ -1,0 +1,54 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "supply-chain-nlp"
+version = "1.2.0"
+description = "物流寄递场景寄件文本智能分类系统：TF-IDF+RF 基线 → fastText → BERT 微调 → 量化/蒸馏压缩 → FastAPI 部署"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+# 依赖只列抽象包名（安装锚定版本用 requirements.txt，避免双源漂移）
+dependencies = [
+    "torch",
+    "transformers",
+    "tokenizers",
+    "safetensors",
+    "scikit-learn",
+    "scipy",
+    "numpy",
+    "pandas",
+    "fasttext-wheel",
+    "jieba",
+    "fastapi",
+    "uvicorn",
+    "pydantic",
+    "python-dotenv",
+    "tenacity",
+    "matplotlib",
+    "tqdm",
+    "joblib",
+]
+
+[project.optional-dependencies]
+llm = ["langchain-openai", "langchain-core", "openai"]
+dev = ["pytest", "httpx", "requests", "wordcloud"]
+
+[tool.setuptools]
+packages = [
+    "config",
+    "src",
+    "src.eda",
+    "src.baseline_rf",
+    "src.fasttext_model",
+    "src.bert_model",
+    "src.compress",
+    "src.llm_classifier",
+    "src.serving",
+    "data",
+    "scripts",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

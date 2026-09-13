@@ -1,6 +1,6 @@
 # 物流寄件文本智能分类服务 —— CPU 推理镜像（脱离本机环境，开箱即用）
-# 构建：docker build -t supply-chain-nlp:1.0.0 .
-# 运行：docker run -d -p 18004:8004 --name supply-chain-nlp supply-chain-nlp:1.0.0
+# 构建：docker build -t supply-chain-nlp:1.2.0 .
+# 运行：docker run -d -p 18004:8004 --name supply-chain-nlp supply-chain-nlp:1.2.0
 FROM python:3.11-slim
 
 ENV PYTHONUNBUFFERED=1 \
@@ -27,6 +27,10 @@ COPY models/bert-base-chinese/config.json models/bert-base-chinese/vocab.txt mod
 COPY models/checkpoints/distill_best_soft.pt models/checkpoints/
 COPY data/class.txt data/stopwords.txt data/
 COPY web/ web/
+
+# 非 root 运行（镜像内只读服务，无写需求）
+RUN useradd --create-home --uid 10001 appuser && chown -R appuser:appuser /app
+USER appuser
 
 EXPOSE 8004
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s \

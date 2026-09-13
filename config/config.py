@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""统一配置：路径全部相对项目根目录，跨平台；超参与课程/简历口径一致。"""
+"""统一配置：路径全部相对项目根目录，跨平台；超参与项目验收基准一致。"""
 import os
 import torch
 
@@ -44,28 +44,30 @@ class Config:
         self.num_classes = len(self.class_list)
 
         # ---------- 设备 ----------
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        # MODEL_DEVICE 环境变量可强制指定（如 Windows 系统内存吃紧时 WDDM 假 OOM，可 MODEL_DEVICE=cpu）
+        self.device = torch.device(os.getenv("MODEL_DEVICE", "") or
+                                   ("cuda" if torch.cuda.is_available() else "cpu"))
 
-        # ---------- BERT 微调超参（课程/简历口径） ----------
+        # ---------- BERT 微调超参 ----------
         self.model_name = "bert"
         self.pretrain_bert_dir = _p("models", "bert-base-chinese")
-        self.num_epochs = 2
+        self.num_epochs = 4
         self.batch_size = 128
         self.learning_rate = 5e-5
-        self.max_len = 32            # 托寄物描述为短文本，讲义口径 pad_size=32
+        self.max_len = 32            # 托寄物短文本，P95 长度约 11 字符，32 足够覆盖
         self.hidden_size = 768
         self.model_save_dir = _p("models", "checkpoints")
         self.model_save_path = _p("models", "checkpoints", "bert_best.pt")
 
         # ---------- fasttext ----------
         self.ft_model_dir = _p("models", "fasttext")
-        self.ft_autotune_duration = 300   # 秒，讲义口径
+        self.ft_autotune_duration = 300   # 秒，自动调参时长
 
         # ---------- 随机森林 ----------
         self.rf_model_dir = _p("models", "baseline_rf")
-        self.rf_max_words = 20000         # 讲义口径：基线只取 2 万条验证可行性
+        self.rf_max_words = 20000         # 基线取 2 万条子集验证可行性
 
-        # ---------- 蒸馏超参（讲义口径） ----------
+        # ---------- 蒸馏超参 ----------
         self.distill_T = 2.0              # 蒸馏温度
         self.distill_alpha = 0.7          # 软损失权重
         self.student_embed = 128
@@ -77,10 +79,15 @@ class Config:
         # ---------- 剪枝 ----------
         self.prune_amount = 0.3           # L1 非结构化剪枝比例
 
-        # ---------- 部署（FastAPI，简历口径） ----------
-        self.serve_host = "0.0.0.0"
+        # ---------- 部署（FastAPI） ----------
+        self.serve_host = "127.0.0.1"     # 默认仅本机；容器/生产由 CMD 或网关显式暴露
         self.serve_port = 8004
         self.confidence_threshold = 0.60  # 低置信度转人工复核（违禁品红线策略）
+
+        # ---------- API 安全（鉴权见 serving/app.py 的 API_AUTH_KEY 环境变量） ----------
+        self.api_max_batch = 100          # 单次请求最大条数
+        self.api_max_text_chars = 512     # 单条文本最大字符数（模型截断 32 token，此处防滥用）
+        self.api_rate_limit_per_min = 60  # 每客户端每分钟最大请求数（内存滑动窗口，单进程口径）
 
     def id2name(self, idx: int) -> str:
         return self.class_list[idx] if 0 <= idx < len(self.class_list) else "其他"

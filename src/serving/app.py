@@ -1,26 +1,38 @@
 # -*- coding: utf-8 -*-
-"""FastAPI 部署（简历口径）：/predict 单条+批量，低置信度转人工复核（违禁品红线策略）。
+"""FastAPI 推理服务：/predict 单条+批量，低置信度转人工复核（违禁品红线策略）。
 
-启动：uvicorn src.serving.app:app --host 0.0.0.0 --port 8004
+启动：uvicorn src.serving.app:app --host 127.0.0.1 --port 8004
 模型选择：MODEL_NAME=distill|bert_int8|bert 环境变量，默认蒸馏模型（上线口径）。
+鉴权：设置环境变量 API_AUTH_KEY 后，/predict 要求请求头 X-API-Key 精确匹配（/health 不鉴权）；
+      不设置则为本机开放模式——仅供 127.0.0.1 本机调试，切勿直接暴露公网。
+限流：内存滑动窗口，每客户端每分钟最多 API_RATE_LIMIT_PER_MIN 次请求（单进程 uvicorn 口径）。
 """
+import hmac
 import os
-import sys
+import threading
+import time
+from collections import defaultdict, deque
+
+import torch
+from fastapi import FastAPI, Header, HTTPException, Request
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel, Field
+from transformers import BertTokenizer
+
+from config.config import Config
+from src.bert_model.bert_pipeline import BertClassifier
+from src.compress.bilstm import BiLSTMClassifier
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-sys.path.insert(0, PROJECT_ROOT)
-import torch  # noqa: E402
-from fastapi import FastAPI, HTTPException  # noqa: E402
-from fastapi.responses import FileResponse  # noqa: E402
-from fastapi.staticfiles import StaticFiles  # noqa: E402
-from pydantic import BaseModel, Field  # noqa: E402
-from transformers import BertTokenizer  # noqa: E402
-from config.config import Config  # noqa: E402
-from src.bert_model.bert_pipeline import BertClassifier  # noqa: E402
-from src.compress.bilstm import BiLSTMClassifier  # noqa: E402
 
 conf = Config()
-app = FastAPI(title="物流寄件文本智能分类服务", version="1.1.0")
+app = FastAPI(title="物流寄件文本智能分类服务", version="1.2.0")
+
+AUTH_KEY = os.getenv("API_AUTH_KEY", "").strip()
+MAX_BATCH = conf.api_max_batch              # 单次请求最大条数
+MAX_TEXT_CHARS = conf.api_max_text_chars    # 单条文本最大字符数
+RATE_LIMIT = conf.api_rate_limit_per_min    # 每客户端每分钟最大请求数
 
 
 class PredictRequest(BaseModel):
@@ -42,15 +54,16 @@ def _load_model():
     if choice == "distill":
         model = BiLSTMClassifier(conf).to(conf.device)
         model.load_state_dict(torch.load(conf.student_save_path.replace(".pt", "_soft.pt"),
-                                         map_location=conf.device))
+                                         map_location=conf.device, weights_only=True))
     elif choice == "bert_int8":
         path = conf.model_save_path.replace(".pt", "_int8.pt")
         model = torch.quantization.quantize_dynamic(
             BertClassifier(conf), {torch.nn.Linear}, dtype=torch.qint8)
-        model.load_state_dict(torch.load(path, map_location="cpu"))
+        model.load_state_dict(torch.load(path, map_location="cpu", weights_only=True))
     else:
         model = BertClassifier(conf).to(conf.device)
-        model.load_state_dict(torch.load(conf.model_save_path, map_location=conf.device))
+        model.load_state_dict(torch.load(conf.model_save_path, map_location=conf.device,
+                                         weights_only=True))
     model.eval()
     tokenizer = BertTokenizer.from_pretrained(conf.pretrain_bert_dir)
     return model, tokenizer
@@ -66,6 +79,27 @@ def _get():
     return _model, _tokenizer
 
 
+def review_decision(prob: float, class_name: str, threshold: float) -> tuple[bool, str]:
+    """人工复核判定（纯函数，便于单测）：低置信度或违禁品红线 -> 转人工。"""
+    if prob < threshold:
+        return True, f"置信度{prob:.2f}低于阈值{threshold}，转人工复核"
+    if class_name == "违禁品":
+        return True, "违禁品类目强制人工复核（寄递安全红线）"
+    return False, ""
+
+
+def validate_texts(texts: str | list[str]) -> list[str]:
+    """入参校验（纯函数，便于单测）：非空、条数与单条长度上限，返回规范化列表。"""
+    items = [texts] if isinstance(texts, str) else texts
+    if not items or not all(isinstance(t, str) and t.strip() for t in items):
+        raise ValueError("texts 必须为非空字符串或非空字符串列表")
+    if len(items) > MAX_BATCH:
+        raise ValueError(f"单次最多 {MAX_BATCH} 条")
+    if any(len(t) > MAX_TEXT_CHARS for t in items):
+        raise ValueError(f"单条文本最长 {MAX_TEXT_CHARS} 字符")
+    return items
+
+
 @torch.no_grad()
 def _infer(texts: list[str]) -> list[PredictItem]:
     model, tokenizer = _get()
@@ -77,22 +111,45 @@ def _infer(texts: list[str]) -> list[PredictItem]:
     items = []
     for i, (text, idx, p) in enumerate(zip(texts, idxs.tolist(), confs.tolist())):
         prob_map = {conf.class_list[j]: round(float(probs[i][j]), 4) for j in range(conf.num_classes)}
-        needs_review, reason = False, ""
-        if p < conf.confidence_threshold:
-            needs_review, reason = True, f"置信度{p:.2f}低于阈值{conf.confidence_threshold}，转人工复核"
-        elif conf.class_list[idx] == "违禁品":
-            needs_review, reason = True, "违禁品类目强制人工复核（寄递安全红线）"
+        needs_review, reason = review_decision(float(p), conf.class_list[idx], conf.confidence_threshold)
         items.append(PredictItem(text=text, class_index=idx, class_name=conf.class_list[idx],
                                  prob=round(float(p), 4), probs=prob_map,
                                  needs_human_review=needs_review, review_reason=reason))
     return items
 
 
+# ---------- 鉴权与限流（/health 不做限制，保证探活可用） ----------
+_rate_buckets: dict[str, deque] = defaultdict(deque)
+_rate_lock = threading.Lock()
+
+
+def _check_auth(api_key: str | None) -> None:
+    if not AUTH_KEY:  # 未配置密钥 = 本机开放模式
+        return
+    if not api_key or not hmac.compare_digest(api_key, AUTH_KEY):
+        raise HTTPException(status_code=401, detail="缺少或错误的 X-API-Key 请求头")
+
+
+def _check_rate(request: Request) -> None:
+    client = request.client.host if request.client else "unknown"
+    now = time.time()
+    with _rate_lock:
+        bucket = _rate_buckets[client]
+        while bucket and now - bucket[0] > 60:
+            bucket.popleft()
+        if len(bucket) >= RATE_LIMIT:
+            raise HTTPException(status_code=429, detail="请求过于频繁，请稍后再试")
+        bucket.append(now)
+
+
 @app.post("/predict", response_model=list[PredictItem])
-def predict(req: PredictRequest):
-    texts = [req.texts] if isinstance(req.texts, str) else req.texts
-    if not texts or not all(isinstance(t, str) and t.strip() for t in texts):
-        raise HTTPException(status_code=400, detail="texts 必须为非空字符串或字符串列表")
+def predict(req: PredictRequest, request: Request, x_api_key: str | None = Header(default=None)):
+    _check_auth(x_api_key)
+    _check_rate(request)
+    try:
+        texts = validate_texts(req.texts)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     return _infer(texts)
 
 

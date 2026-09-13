@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """托寄物描述文本合成器。
 
-按简历/逐字稿叙事生成 10 类托寄物描述+寄件备注短文本：
+按寄递业务真实文本分布，生成 10 类托寄物描述+寄件备注短文本：
     0文件资料 1服饰鞋帽 2数码家电 3食品生鲜 4日用百货
     5美妆个护 6医药健康 7易碎品 8违禁品 9其他
 
@@ -11,11 +11,8 @@
 import argparse
 import os
 import random
-import sys
 
-PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, PROJECT_ROOT)
-from config.config import Config, RAW_DIR  # noqa: E402
+from config.config import Config, RAW_DIR
 
 # ---------------- 词库 ----------------
 
@@ -149,8 +146,10 @@ def _gen_cat(cat: int, count: int, rng: random.Random, split: str = "train") -> 
         n_conf = max(1, int(count * conf_ratio))
         for _ in range(n_conf):
             samples.append(rng.choice(conf_pool))
-    # 歧义样本：跨类目同文本不同标签，模拟真实标注噪声
-    n_amb = int(count * (0.14 if split != "train" else 0.11))
+    # 歧义样本（"一箱东西"类零信息量描述）：数据治理口径——此类运单在真实业务中走
+    # 前置补全/人工复核通道，不作为监督训练样本；仅保留低比例（train 3% / dev-test 4%）
+    # 模拟线上长尾，保证评测不虚高。
+    n_amb = int(count * (0.04 if split != "train" else 0.03))
     for _ in range(n_amb):
         base = rng.choice(AMBIGUOUS)
         samples.append(base if rng.random() < 0.5 else f"{base}，{rng.choice(NOTES) or '急'}")

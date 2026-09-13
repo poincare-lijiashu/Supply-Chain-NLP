@@ -1,23 +1,23 @@
 # -*- coding: utf-8 -*-
-"""BERT 文本分类：模型 / 数据 / 训练 / 评估 / 预测。修复课程版三处 bug：
-1) 训练保存逻辑反向（f1 越高才保存）；2) predict 循环内误用整批 texts 编码；
+"""BERT 文本分类：模型 / 数据 / 训练 / 评估 / 预测。相对初版实现修复三处缺陷：
+1) 训练保存逻辑反向（验证集提升才保存）；2) predict 循环内误用整批 texts 编码；
 3) evaluate 提前 break 只评一个 batch。"""
 import os
-import sys
 import time
 
-PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-sys.path.insert(0, PROJECT_ROOT)
-import numpy as np  # noqa: E402
-import torch  # noqa: E402
-import torch.nn as nn  # noqa: E402
-from sklearn.metrics import (accuracy_score, classification_report, confusion_matrix,  # noqa: E402
+import numpy as np
+import torch
+import torch.nn as nn
+from sklearn.metrics import (accuracy_score, classification_report, confusion_matrix,
                              f1_score)
-from torch.optim import AdamW  # noqa: E402
-from torch.utils.data import DataLoader, Dataset  # noqa: E402
-from tqdm import tqdm  # noqa: E402
-from transformers import BertConfig, BertModel, BertTokenizer  # noqa: E402
-from config.config import Config  # noqa: E402
+from torch.optim import AdamW
+from torch.utils.data import DataLoader, Dataset
+from tqdm import tqdm
+from transformers import BertConfig, BertModel, BertTokenizer
+
+from config.config import Config
+
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
 def load_raw_data(path: str):
@@ -143,7 +143,8 @@ def test_and_report(conf: Config, model=None):
     _, _, test_loader = build_loaders(conf)
     if model is None:
         model = BertClassifier(conf).to(conf.device)
-        model.load_state_dict(torch.load(conf.model_save_path, map_location=conf.device))
+        model.load_state_dict(torch.load(conf.model_save_path, map_location=conf.device,
+                                         weights_only=True))
     t0 = time.time()
     acc, f1, report, cm, _, _ = evaluate(model, test_loader, conf)
     eval_time = time.time() - t0
@@ -158,7 +159,7 @@ def predict(texts, conf: Config, model_path: str | None = None, return_model=Fal
     model_path = model_path or conf.model_save_path
     tokenizer = BertTokenizer.from_pretrained(conf.pretrain_bert_dir)
     model = BertClassifier(conf).to(conf.device)
-    model.load_state_dict(torch.load(model_path, map_location=conf.device))
+    model.load_state_dict(torch.load(model_path, map_location=conf.device, weights_only=True))
     model.eval()
     if isinstance(texts, str):
         texts = [texts]

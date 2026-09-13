@@ -1,15 +1,15 @@
 # -*- coding: utf-8 -*-
 """模型量化（动态量化 int8，仅 CPU）与剪枝（L1 非结构化 30%）+ 体积/延迟基准。"""
 import os
-import sys
 import time
 
+import torch
+import torch.nn.utils.prune as prune
+
+from config.config import Config
+from src.bert_model.bert_pipeline import BertClassifier, build_loaders, evaluate
+
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-sys.path.insert(0, PROJECT_ROOT)
-import torch  # noqa: E402
-import torch.nn.utils.prune as prune  # noqa: E402
-from config.config import Config  # noqa: E402
-from src.bert_model.bert_pipeline import BertClassifier, build_loaders, evaluate  # noqa: E402
 
 
 def file_size_mb(path: str) -> float:
@@ -20,13 +20,15 @@ def quantize(conf: Config):
     """动态量化：Linear 权重 float32 -> int8，仅 CPU 执行。"""
     _, _, test_loader = build_loaders(conf)
     model = BertClassifier(conf)  # CPU
-    model.load_state_dict(torch.load(conf.model_save_path, map_location="cpu"))
+    model.load_state_dict(torch.load(conf.model_save_path, map_location="cpu", weights_only=True))
     model.eval()
 
     q_model = torch.quantization.quantize_dynamic(model, {torch.nn.Linear}, dtype=torch.qint8)
     acc, f1, report, cm, _, _ = evaluate(q_model, test_loader, conf, device=torch.device("cpu"))
     q_path = conf.model_save_path.replace(".pt", "_int8.pt")
-    torch.save(q_model, q_path)
+    # 保存 state_dict（而非整模型 pickle）：serving 端 quantize_dynamic 后 load_state_dict 加载，
+    # 且 weights_only=True 反序列化仅允许张量容器，更安全
+    torch.save(q_model.state_dict(), q_path)
     summary = (f"动态量化(int8, Linear) Test Acc={acc:.4f}, Macro F1={f1:.4f}\n"
                f"模型体积: fp32 {file_size_mb(conf.model_save_path):.1f}MB -> int8 {file_size_mb(q_path):.1f}MB\n"
                f"量化模型: {q_path}\n{report}")
@@ -38,7 +40,8 @@ def prune_model(conf: Config):
     """对 12 层 encoder 的 attention query 权重做 L1 全局非结构化剪枝 30%。"""
     _, _, test_loader = build_loaders(conf)
     model = BertClassifier(conf).to(conf.device)
-    model.load_state_dict(torch.load(conf.model_save_path, map_location=conf.device))
+    model.load_state_dict(torch.load(conf.model_save_path, map_location=conf.device,
+                                     weights_only=True))
     acc0, f10, _, _, _, _ = evaluate(model, test_loader, conf, full=False)
 
     params_to_prune = [(model.bert.encoder.layer[i].attention.self.query, "weight") for i in range(12)]
@@ -81,7 +84,8 @@ def benchmark(conf: Config, n: int = 100):
         return (time.time() - t0) / n * 1000
 
     fp32_model = BertClassifier(conf)  # CPU
-    fp32_model.load_state_dict(torch.load(conf.model_save_path, map_location="cpu"))
+    fp32_model.load_state_dict(torch.load(conf.model_save_path, map_location="cpu",
+                                          weights_only=True))
     q_model = torch.quantization.quantize_dynamic(fp32_model, {torch.nn.Linear}, dtype=torch.qint8)
     cpu = torch.device("cpu")
     lat_fp32 = latency(fp32_model, cpu)
