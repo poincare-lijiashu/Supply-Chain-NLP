@@ -76,8 +76,9 @@ def latency_chart():
     for b, v in zip(bars, LATENCY["ms"][::-1]):
         ax.text(v + 0.4, b.get_y() + b.get_height() / 2, f"{v:.2f} ms",
                 va="center", fontsize=10, fontweight="bold")
+    speedup = LATENCY["ms"][0] / LATENCY["ms"][-1]
     ax.set_xlabel("CPU 单条推理延迟 (ms)")
-    ax.set_title("压缩带来约 20× 推理加速", fontsize=13, fontweight="bold")
+    ax.set_title(f"压缩带来约 {speedup:.0f}× 推理加速（BERT fp32 / 蒸馏 BiLSTM）", fontsize=13, fontweight="bold")
     ax.spines[["top", "right"]].set_visible(False)
     ax.grid(axis="x", alpha=0.3)
     fig.tight_layout()
