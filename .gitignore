@@ -6,6 +6,7 @@ models/baseline_rf/
 models/baseline_v2/
 models/smoke/
 data/raw/
+data/raw_v2_d2_backup/
 data/processed/
 # 护栏词表（可再生成，但小且部署必需 → 白名单进库保证 clone 自包含）
 !data/processed/oov_vocab.json
