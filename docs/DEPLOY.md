@@ -148,7 +148,7 @@ python -m src.serving.client    # 对着已启动的服务跑一遍真实预测
 
 - **端口被占**：改 compose `ports` 映射或 `--port`；确认 `netstat -ano | findstr 8004`（Windows）
 - **强制 CPU 推理**：设置环境变量 `MODEL_DEVICE=cpu`（Windows 系统内存吃紧时 CUDA 可能报"假 OOM"——显存充足仍报错，强制 CPU 最稳；容器内 CPU 推理不受影响）
-- **护栏词表缺失**：OOV/红线护栏加载失败会降级（见 serving 日志告警）——词表由 `scripts/build_oov_vocab.py` / `scripts/build_redline_words.py` 可再生成
+- **护栏词表缺失**：OOV 词表缺失 → **fail-closed**（未登录词无法判定，中间带样本全部转人工，见 serving 日志告警后立即重建词表）；红线词库缺失 → fail-open（仅损失禁寄词强拦）。两个词表均可由 `scripts/build_oov_vocab.py` / `scripts/build_redline_words.py` 再生成
 - **模型文件缺失报错**：`MODEL_NAME=bert` 需要 `checkpoints_v2/bert_best.pt` 先训练产出；默认 `distill` 只需 `checkpoints_v2/distill_best_soft.pt`
 - **Windows 防火墙**：本机回环访问不需要放行；仅容器端口映射访问异常时检查 Docker Desktop 网络配置
 - **首次启动慢**：加载模型单例约数秒，`HEALTHCHECK` 已设 `start-period=20s`
