@@ -69,6 +69,21 @@
    [docs/badcase_patch_v2.md](docs/badcase_patch_v2.md)
 > 复现：教师/学生六尺评测见 `python scripts/eval_teacher_v2.py` / `python scripts/eval_teacher_v2_extra.py` /
 > `python scripts/eval_student_v2.py`；蒸馏：`BERT_INIT=1 DST_MODE=soft python -m src.compress.distill`。
+
+### 效果可视化
+**前端工作台**（批量输入 / 15 类置信度 / 红线·低置信·OOV 自动标记转人工）：
+![前端工作台](docs/img/workbench.png)
+**模型升级阶梯与压缩收益**：
+| 测试集准确率阶梯 | 推理延迟对比 |
+|---|---|
+| ![模型阶梯](docs/img/model_stairs.png) | ![延迟对比](docs/img/latency.png) |
+**混淆矩阵验证蒸馏保真**（教师 vs 学生，错误分布一致）：
+| 教师 BERT | 蒸馏 BiLSTM（上线） |
+|---|---|
+| ![BERT 混淆矩阵](docs/img/bert_confusion_matrix.png) | ![蒸馏混淆矩阵](docs/img/distill_confusion_matrix.png) |
+> 图表排版同源 `python -m scripts.make_charts`；上图基于 v1（10 类）基准渲染——v2（15 类）六尺数据见上文表格，
+> v2 同款图待 make_charts 按新数据重新生成后原位替换（架构图已更新为 v2.1）。
+
 ## 5. 快速开始
 ```bash
 # 1) 环境（Python 3.11）
@@ -120,6 +135,12 @@ API_AUTH_KEY=my-secret DATA_VERSION=v2 uvicorn src.serving.app:app --port 8004  
 - **歧义池**：最高票平票 → 人工仲裁；涉违禁负样本自动进抽审清单（review.txt，每周人工 gate）
 > 全量回传（改判+未改判都回）规避负样本偏置；严格人工门禁，**禁止全自动重训**。
 > 迭代门槛：真实正样本 ≥5 万且六尺不降，触发 d3 全流程重训。契约见 [docs/DATA_FEEDBACK.md](docs/DATA_FEEDBACK.md)。
+
+### LLM 对照实验（v1 基准实测，v2 未复测）
+DeepSeek（few-shot，零训练）在同一难度基准 dev 上实测 **72.55%**，远低于领域微调（BERT 96.5% / 蒸馏 96.5%）——
+"调 API"替代不了领域训练；LLM 定位=新类目冷启动标注辅助与兜底。v2（15 类）复测待配置 `.env` 的
+DeepSeek key 后进行（复现：`python -m src.llm_classifier.llm_classify`）。
+
 ## 8. 目录结构
 ```
 Supply Chain NLP/
