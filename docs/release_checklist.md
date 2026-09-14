@@ -24,7 +24,7 @@
 
 ## 仓库元数据（gh token 权限不足，需在 GitHub Settings 手动填写）
 
-- **About 描述**：物流寄件文本智能分类系统：BERT 微调 → 知识蒸馏（96.46%，20.9MB，CPU 1.3ms）→ FastAPI + Docker 部署，违禁品红线自动转人工
+- **About 描述**：物流寄件文本智能分类：词库驱动数据工程(15类/30万) → BERT 微调 → 知识蒸馏(20.9MB·test-ID 99.80%·违禁召回99.28%) → FastAPI+Docker；红线/低置信/OOV 护栏转人工，复检终判回流迭代
 - **Topics**：`nlp` `bert` `knowledge-distillation` `text-classification` `fastapi` `logistics` `pytorch` `docker`
 - **Website**（可选）：无
 

@@ -2,7 +2,7 @@
 ![CI](https://github.com/poincare-lijiashu/Supply-Chain-NLP/actions/workflows/ci.yml/badge.svg)
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Python](https://img.shields.io/badge/python-3.11%2B-blue)
-![Pytest](https://img.shields.io/badge/tests-62%20passed-brightgreen)
+![Pytest](https://img.shields.io/badge/tests-66%20passed-brightgreen)
 > 短文本多分类：把用户下单时填写的**托寄物描述与寄件备注**实时分到 15 个类目，
 > 替代人工完成寄件初审的分类环节，支撑自动制单、计费定价与违禁品初筛；
 > 快递员复检终判回流形成**真实标签飞轮**，持续驱动模型迭代。
@@ -18,7 +18,6 @@
 - 行业对标：顺丰丰语大模型（寄件意图识别）、货拉拉（司机侧违禁品识别）、快递100（一句话寄快递）、京东物流（地址解析）
 ## 2. 系统架构
 ![系统架构](docs/img/architecture.svg)
-> 交互版（含暗色主题）：[docs/img/architecture.html](docs/img/architecture.html)
 **设计要点**
 - **数据先行**：类目对齐中通快运 27 类 / 顺丰 17 组 / 邮政局禁寄 19 子类，定版为 15 类；
   30 万训练语料由 YAML 词库（8000+ 词位）确定性生成，标签零人工标注污染，hash 冻结训练只读
@@ -160,11 +159,11 @@ Supply Chain NLP/
 ├── docs/                          # P 系列计划 / DATASHEET / DATA_FEEDBACK / badcase / DEPLOY
 ├── Dockerfile / docker-compose.yml / nginx.conf
 ├── pyproject.toml / LICENSE
-└── tests/                         # pytest（62 passed：核心单测/数据/安全/冒烟）
+└── tests/                         # pytest（66 passed：核心单测/数据/安全/冒烟）
 ```
 ## 9. 工程说明
 - 关键缺陷修复均有留档与回归测试：pack padding 漂移（单条≡批量回归锁定）、标签审计方法论教训等
 - 真实密钥不入库：`.env` 已 gitignore，仓库只含 `.env.example`
 - 固定随机种子（v2 数据 seed=2026~2032）；训练产物与权重 gitignore，重要 checkpoint 异地备份
 - 上线学生 `models/checkpoints_v2/distill_best_soft.pt`（备份 `distill_best_soft_ep3_v09972.pt`）
-- 测试 62 passed：蒸馏损失公式/复核判定/入参校验/单条≡批量不变量/v2 数据一致性/安全测试
+- 测试 66 passed：蒸馏损失公式/复核判定/入参校验/单条≡批量不变量/护栏行为(红线/OOV/feedback)/v2 数据一致性/安全测试

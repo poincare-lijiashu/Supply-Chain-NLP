@@ -139,7 +139,7 @@ sudo systemctl daemon-reload && sudo systemctl enable --now scnlp
 ## 5. 验证清单
 
 ```bash
-pytest -q                       # 单测：62 passed（核心算法 + v2 数据/配置 + 安全 + 生成器规则）
+pytest -q                       # 单测：66 passed（核心算法 + v2 数据/配置 + 安全 + 生成器规则）
 python -m scripts.eval_student_v2   # 学生六尺上报（上线前回归）
 python -m src.serving.client    # 对着已启动的服务跑一遍真实预测
 ```
