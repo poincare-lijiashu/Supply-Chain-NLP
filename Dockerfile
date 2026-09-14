@@ -28,7 +28,7 @@ COPY models/bert-base-chinese/config.json models/bert-base-chinese/vocab.txt mod
 COPY models/checkpoints_v2/distill_best_soft.pt models/checkpoints_v2/
 COPY data/raw_v2/class.txt data/raw_v2/
 COPY data/stopwords.txt data/
-COPY data/processed/oov_vocab.pkl data/processed/redline_words.pkl data/processed/
+COPY data/processed/oov_vocab.json data/processed/redline_words.json data/processed/
 COPY web/ web/
 
 # 非 root 运行（镜像内只读服务，无写需求）

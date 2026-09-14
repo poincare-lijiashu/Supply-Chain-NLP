@@ -65,7 +65,7 @@ $("#clear").addEventListener("click", () => {
   input.value = "";
   resultsEl.classList.add("empty");
   resultsEl.innerHTML = document.querySelector("#results").dataset.emptyHtml
-    || '<div class="empty-guide"><p class="empty-title">三步完成寄件初审</p><ol><li>左侧输入托寄物描述（可批量多行）</li><li>点击「开始分类」，模型实时给出 10 类置信度</li><li>低置信度与违禁品命中自动标记 → 转人工复核</li></ol></div>';
+    || '<div class="empty-guide"><p class="empty-title">三步完成寄件初审</p><ol><li>左侧输入托寄物描述（可批量多行）</li><li>点击「开始分类」，模型实时给出 15 类置信度</li><li>低置信度与违禁品命中自动标记 → 转人工复核</li></ol></div>';
 });
 document.querySelectorAll(".chip").forEach(c =>
   c.addEventListener("click", () => { input.value += (input.value ? "\n" : "") + c.dataset.text; }));

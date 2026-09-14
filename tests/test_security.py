@@ -3,10 +3,13 @@
 
 需要模型权重的用例（429/200）在本机跑（权重存在时生效）；CI 单测阶段无权重自动跳过。"""
 import importlib
+import json
 import os
 
 import pytest
 from fastapi.testclient import TestClient
+
+os.environ.setdefault("DATA_VERSION", "v2")  # 安全测试跟随当前主线 v2（15 类）
 
 import src.serving.app as app_mod
 from config.config import Config
@@ -93,3 +96,56 @@ def test_health_open_even_with_auth(auth_on):
     """/health 不鉴权，保证探活可用。"""
     client = TestClient(app_mod.app)
     assert client.get("/health").status_code == 200
+
+
+# ---------- 护栏行为（红线词库 / OOV / feedback 幂等与上限） ----------
+
+def _write_words(tmp_path, words):
+    p = tmp_path / "words.json"
+    p.write_text(json.dumps(words), encoding="utf-8")
+    return os.fspath(p)
+
+
+def test_redline_hit_matches(tmp_path, monkeypatch):
+    monkeypatch.setattr(app_mod, "_REDLINE_WORDS_PATH", _write_words(tmp_path, ["小猫", "充电宝"]))
+    monkeypatch.setattr(app_mod, "_redline_words", None)
+    assert "小猫" in app_mod._redline_hit("寄小猫一只")
+    assert app_mod._redline_hit("一箱车厘子") == []
+
+
+def test_oov_unseen_marks_novel(tmp_path, monkeypatch):
+    monkeypatch.setattr(app_mod, "_OOV_VOCAB_PATH", _write_words(tmp_path, ["车厘子", "手表"]))
+    monkeypatch.setattr(app_mod, "_oov_vocab", None)
+    assert "炒锅" in app_mod._unseen_words("寄一口炒锅")
+    assert app_mod._unseen_words("车厘子") == []
+
+
+def test_feedback_auth_and_dedup(tmp_path, monkeypatch):
+    monkeypatch.setattr(app_mod, "FEEDBACK_AUTH_KEY", "fb-key-9")
+    monkeypatch.setattr(app_mod, "FEEDBACK_DIR", os.fspath(tmp_path))
+    monkeypatch.setattr(app_mod, "_fb_seen", None)
+    client = TestClient(app_mod.app)
+    body = dict(sn="fb1", text="小猫", human_class=13, model_pred=4,
+                model_conf=0.93, model_ver="t", ts="t")
+    assert client.post("/feedback", json=body).status_code == 401
+    hd = {"X-API-Key": "fb-key-9"}
+    r = client.post("/feedback", json=body, headers=hd)
+    assert r.status_code == 200 and r.json()["accepted"] is True
+    assert client.post("/feedback", json=body, headers=hd).json()["dedup"] is True
+
+
+def test_feedback_max_sn_cap(tmp_path, monkeypatch):
+    monkeypatch.setattr(app_mod, "FEEDBACK_AUTH_KEY", "fb-key-9")
+    monkeypatch.setattr(app_mod, "FEEDBACK_MAX_SN", 2)
+    monkeypatch.setattr(app_mod, "FEEDBACK_DIR", os.fspath(tmp_path))
+    monkeypatch.setattr(app_mod, "_fb_seen", None)
+    client = TestClient(app_mod.app)
+    hd = {"X-API-Key": "fb-key-9"}
+    for i in range(2):
+        r = client.post("/feedback", json=dict(sn=f"s{i}", text=f"物品{i}", human_class=3,
+                                               model_pred=3, model_conf=0.9, model_ver="t", ts="t"),
+                        headers=hd)
+        assert r.status_code == 200
+    r = client.post("/feedback", json=dict(sn="s9", text="物品9", human_class=3, model_pred=3,
+                                           model_conf=0.9, model_ver="t", ts="t"), headers=hd)
+    assert r.status_code == 429

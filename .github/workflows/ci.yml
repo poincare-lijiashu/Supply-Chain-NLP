@@ -20,7 +20,9 @@ jobs:
           # fasttext 0.9.x 与 numpy 2.x 兼容补丁（与 Dockerfile 保持一致）
           python -c "import fasttext, pathlib; p = pathlib.Path(fasttext.__file__).parent / 'FastText.py'; s = p.read_text(encoding='utf-8'); p.write_text(s.replace('np.array(probs, copy=False)', 'np.asarray(probs)'), encoding='utf-8')"
       - name: Generate smoke data
-        run: python -m data.generate_data --train 4000 --dev 500 --test 500 --outdir data/raw
+        run: |
+          python -m data.generate_data --train 4000 --dev 500 --test 500 --outdir data/raw
+          python -m data.generate_v2 --train 3000 --dev 500 --seed 2026
       - name: Fetch BERT checkpoint (skip if present)
         run: >
           python -c "import os, shutil; from huggingface_hub import hf_hub_download; dst='models/bert-base-chinese/model.safetensors'; shutil.copy(hf_hub_download('bert-base-chinese', 'model.safetensors'), dst) if not os.path.exists(dst) else print('checkpoint ready')"

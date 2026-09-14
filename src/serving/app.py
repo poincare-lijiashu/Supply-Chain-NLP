@@ -146,7 +146,7 @@ def _unseen_words(text: str) -> list[str]:
                 _oov_vocab = set(json.load(fh))
             print(f"[serving] OOV 词表已加载: {len(_oov_vocab)} 词")
         except Exception as e:
-            print(f"[serving] OOV 词表加载失败，护栏降级为全放行: {e}")
+            print(f"[serving] OOV 词表加载失败，护栏 fail-closed（未登录词无法判定，中间带样本将全部转人工），请立即修复: {e}")
             _oov_vocab = set()
     unseen: list[str] = []
     for w in jieba.cut(text):

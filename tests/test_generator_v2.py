@@ -6,10 +6,11 @@
   1. 规则场景断言：生成器 R11/R12/R7/R9/R1/R27 等场景 → 断言 label 正确
   2. 手工语义断言：把手册中可机检的硬性例句（如"充电宝数据线两根→2"）直接断言
 本测试只依赖词库与生成器，不加载模型，CPU 秒级。"""
+import os
 import random
 import sys
 
-sys.path.insert(0, r"D:\workspace_AI\workspace_traecode\xiangmu_traecode\Supply Chain NLP")
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import pytest
 
