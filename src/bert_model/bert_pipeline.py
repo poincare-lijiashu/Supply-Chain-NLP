@@ -182,3 +182,5 @@ if __name__ == "__main__":
     conf = Config()
     model, best_acc, test_loader = train(conf, limit=None)
     test_and_report(conf, model)
+    # 防止 CUDA 清理崩溃触发任务框架重跑（同 distill.py 注释）
+    os._exit(0)

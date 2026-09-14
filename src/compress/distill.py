@@ -102,11 +102,19 @@ def distill(conf: Config, mode: str = "soft", limit: int | None = None):
 if __name__ == "__main__":
     conf = Config()
     conf.bert_config = BertConfig.from_pretrained(conf.pretrain_bert_dir)
+    # v2 蒸馏开关：BERT_INIT=1 用 BERT 字向量初始化学生（P12b 核心改进）
+    conf.init_from_bert = os.getenv("BERT_INIT", "0") == "1"
+    # 模式：默认三个全跑；v2 可 DST_MODE=soft 只跑 soft（30万数据上跑三模式太重，soft 为主轨）
+    modes = [m.strip() for m in os.getenv("DST_MODE", "soft,hard,intermediate").split(",") if m.strip()]
+    print(f"[distill] data_version={conf.data_version}, init_from_bert={conf.init_from_bert}, modes={modes}")
     results = []
-    for mode in ["soft", "hard", "intermediate"]:
+    for mode in modes:
         results.append(distill(conf, mode=mode)[1])
     out = os.path.join(PROJECT_ROOT, "experiments", "distill.md")
     os.makedirs(os.path.dirname(out), exist_ok=True)
     with open(out, "w", encoding="utf-8") as f:
         f.write("# 知识蒸馏实验（教师 BERT -> 学生 BiLSTM）\n\n```\n" + "\n".join(results) + "\n```\n")
     print(f"已保存 -> {out}")
+    # Windows 下 CUDA 上下文清理会触发 0xC0000409 崩溃（退出码非 0），
+    # 导致任务框架自动重跑并覆盖已保存的 checkpoint。跳过清理强制正常退出。
+    os._exit(0)

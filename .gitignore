@@ -1,10 +1,15 @@
 # 模型权重与数据
 models/checkpoints/
+models/checkpoints_v2/
 models/fasttext/
 models/baseline_rf/
+models/baseline_v2/
 models/smoke/
 data/raw/
 data/processed/
+# 护栏词表（可再生成，但小且部署必需 → 白名单进库保证 clone 自包含）
+!data/processed/oov_vocab.pkl
+!data/processed/redline_words.pkl
 data/smoke/
 # bert-base-chinese 只入库分词器小文件（权重 model.safetensors 按 README 下载）
 models/bert-base-chinese/*

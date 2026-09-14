@@ -91,7 +91,7 @@ def test_validate_texts_rejects_oversize_batch_and_length():
 
 def test_config_id2name_bounds():
     conf = Config()
-    assert conf.id2name(0) == "文件资料"
+    assert conf.id2name(0) == "文件证件"
     assert conf.id2name(conf.num_classes - 1) == conf.class_list[-1]
     assert conf.id2name(99) == "其他"
     assert conf.id2name(-1) == "其他"
@@ -119,3 +119,31 @@ def test_bilstm_forward_shapes():
     assert logits.shape == (2, conf.num_classes)
     _, hidden = model(ids, mask, return_hidden=True)
     assert hidden.shape == (2, conf.hidden_size)   # 中间层对齐教师 768 维
+
+
+def test_bilstm_single_vs_batch_invariant():
+    """padding 不得改变任何样本的预测：单条（无 pad）与混入动态 pad 批量的 logits 必须逐位一致。
+
+    回归 2026-09-14 线上事故：旧实现取 lstm_out[:, -1, :]（张量末位=填充位），
+    训练/测试 batch=128 大批 padding，上线前端单条请求无 padding，两者句向量分布不同，
+    表现为测试集 96.46% 但前端单条分类全错（一箱车厘子->医药健康 0.8244）。
+    """
+    conf = Config()
+    conf.student_embed, conf.student_hidden = 8, 16
+    conf.student_layers, conf.student_dropout = 1, 0.0
+    torch.manual_seed(42)
+    model = BiLSTMClassifier(conf).eval()
+    a = torch.randint(1, 1000, (1, 3))   # 短样本
+    b = torch.randint(1, 1000, (1, 5))   # 长样本
+    with torch.no_grad():
+        single_a = model(a, torch.ones(1, 3, dtype=torch.long))[0]
+        single_b = model(b, torch.ones(1, 5, dtype=torch.long))[0]
+        # 同批：短样本尾部补 2 个 pad（id=0，mask=0）
+        a_padded = torch.cat([a, torch.zeros(1, 2, dtype=a.dtype)], dim=1)
+        ids = torch.cat([a_padded, b], dim=0)
+        mask = torch.tensor([[1, 1, 1, 0, 0], [1, 1, 1, 1, 1]], dtype=torch.long)
+        batch = model(ids, mask)
+    assert torch.allclose(batch[0], single_a, atol=1e-5)
+    assert torch.allclose(batch[1], single_b, atol=1e-5)
+    assert batch.argmax(dim=-1).tolist() == [single_a.argmax().item(),
+                                             single_b.argmax().item()]

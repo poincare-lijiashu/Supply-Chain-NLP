@@ -11,7 +11,10 @@ services:
       dockerfile: Dockerfile
     environment:
       MODEL_NAME: distill     # distill | bert_int8 | bert
+      DATA_VERSION: v2
       API_AUTH_KEY: ${API_AUTH_KEY:-}   # 设置后 /predict 需带 X-API-Key 请求头（.env 提供）
+    volumes:
+      - ./data/feedback:/app/data/feedback:rw   # 复检终判回流持久化（容器重建不丢）
     restart: unless-stopped
     expose:
       - "8004"                # 仅容器网络内可见（无固定宿主端口，扩容不冲突）

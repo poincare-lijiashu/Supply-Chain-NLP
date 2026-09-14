@@ -5,7 +5,8 @@ FROM python:3.11-slim
 
 ENV PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
-    MODEL_NAME=distill
+    MODEL_NAME=distill \
+    DATA_VERSION=v2
 
 WORKDIR /app
 
@@ -22,10 +23,12 @@ COPY config/ config/
 COPY src/ src/
 COPY scripts/ scripts/
 
-# 运行时资产：分词器（~400KB）+ 蒸馏学生权重（21MB）+ 类目/停用词
+# 运行时资产：分词器（~400KB）+ 蒸馏学生权重（21MB）+ 类目/停用词 + 护栏词表
 COPY models/bert-base-chinese/config.json models/bert-base-chinese/vocab.txt models/bert-base-chinese/tokenizer_config.json models/bert-base-chinese/tokenizer.json models/bert-base-chinese/
-COPY models/checkpoints/distill_best_soft.pt models/checkpoints/
-COPY data/class.txt data/stopwords.txt data/
+COPY models/checkpoints_v2/distill_best_soft.pt models/checkpoints_v2/
+COPY data/raw_v2/class.txt data/raw_v2/
+COPY data/stopwords.txt data/
+COPY data/processed/oov_vocab.pkl data/processed/redline_words.pkl data/processed/
 COPY web/ web/
 
 # 非 root 运行（镜像内只读服务，无写需求）

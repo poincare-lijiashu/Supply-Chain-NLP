@@ -19,11 +19,14 @@ def _p(*parts):
 
 class Config:
     def __init__(self):
-        # ---------- 数据 ----------
-        self.train_path = _p("data", "raw", "train.txt")
-        self.dev_path = _p("data", "raw", "dev.txt")
-        self.test_path = _p("data", "raw", "test.txt")
-        self.class_path = _p("data", "class.txt")
+        # ---------- 数据（DATA_VERSION=v2 时读 raw_v2，15 类） ----------
+        # v1 保持 data/raw + data/class.txt；v2 输出隔离到 data/raw_v2 + models/checkpoints_v2
+        self.data_version = os.getenv("DATA_VERSION", "v1")
+        _v2 = self.data_version == "v2"
+        self.train_path = _p("data", "raw_v2" if _v2 else "raw", "train.txt")
+        self.dev_path = _p("data", "raw_v2" if _v2 else "raw", "dev.txt")
+        self.test_path = _p("data", "raw_v2" if _v2 else "raw", "test-ID.txt")
+        self.class_path = _p("data", "raw_v2", "class.txt") if _v2 else _p("data", "class.txt")
         self.stopwords_path = _p("data", "stopwords.txt")
         self.process_dir = _p("data", "processed")
         self.process_train_path = _p("data", "processed", "train_process.csv")
@@ -56,8 +59,10 @@ class Config:
         self.learning_rate = 5e-5
         self.max_len = 32            # 托寄物短文本，P95 长度约 11 字符，32 足够覆盖
         self.hidden_size = 768
-        self.model_save_dir = _p("models", "checkpoints")
-        self.model_save_path = _p("models", "checkpoints", "bert_best.pt")
+        # v2 模型输出隔离到 checkpoints_v2（不覆盖 v1 的 bert_best.pt / distill_best.pt）
+        ckpt_dir = "checkpoints_v2" if _v2 else "checkpoints"
+        self.model_save_dir = _p("models", ckpt_dir)
+        self.model_save_path = _p("models", ckpt_dir, "bert_best.pt")
 
         # ---------- fasttext ----------
         self.ft_model_dir = _p("models", "fasttext")
@@ -74,7 +79,7 @@ class Config:
         self.student_hidden = 256
         self.student_layers = 2
         self.student_dropout = 0.3
-        self.student_save_path = _p("models", "checkpoints", "distill_best.pt")
+        self.student_save_path = _p("models", ckpt_dir, "distill_best.pt")
 
         # ---------- 剪枝 ----------
         self.prune_amount = 0.3           # L1 非结构化剪枝比例
