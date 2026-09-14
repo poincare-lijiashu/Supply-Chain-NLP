@@ -11,7 +11,6 @@
 import hmac
 import json
 import os
-import pickle
 import re
 import threading
 import time
@@ -43,20 +42,21 @@ RATE_LIMIT = conf.api_rate_limit_per_min    # 每客户端每分钟最大请求�
 OOV_GUARD = os.getenv("OOV_GUARD", "1") == "1"   # OOV_GUARD=0 关闭
 OOV_LOW = float(os.getenv("OOV_LOW", "0.60"))
 OOV_HIGH = float(os.getenv("OOV_HIGH", "0.95"))
-_OOV_VOCAB_PATH = os.path.join(PROJECT_ROOT, "data", "processed", "oov_vocab.pkl")
+_OOV_VOCAB_PATH = os.path.join(PROJECT_ROOT, "data", "processed", "oov_vocab.json")
 _SKIP_TOKEN = re.compile(r"^[\d\W_]+$")
 _ASCII_ONLY = re.compile(r"^[A-Za-z]+$")
 _oov_vocab: set | None = None
 
 # ---------- 红线命中护栏（禁寄词库命中 → 强制转人工，与置信度无关） ----------
 REDLINE_GUARD = os.getenv("REDLINE_GUARD", "1") == "1"
-_REDLINE_WORDS_PATH = os.path.join(PROJECT_ROOT, "data", "processed", "redline_words.pkl")
+_REDLINE_WORDS_PATH = os.path.join(PROJECT_ROOT, "data", "processed", "redline_words.json")
 _redline_words: set | None = None
 
 # ---------- 真实标签回流（快递员复检终判 → 逐条 JSONL，按天分片） ----------
 FEEDBACK_DIR = os.path.join(PROJECT_ROOT, "data", "feedback")
 FEEDBACK_AUTH_KEY = os.getenv("FEEDBACK_AUTH_KEY", "").strip()
 FEEDBACK_RATE_LIMIT = int(os.getenv("FEEDBACK_RATE_LIMIT", "120"))
+FEEDBACK_MAX_SN = int(os.getenv("FEEDBACK_MAX_SN", "100000"))  # 幂等 sn 集合上限，防无界增长
 _fb_lock = threading.Lock()
 _fb_seen: set | None = None
 
@@ -142,8 +142,8 @@ def _unseen_words(text: str) -> list[str]:
     global _oov_vocab
     if _oov_vocab is None:
         try:
-            with open(_OOV_VOCAB_PATH, "rb") as fh:
-                _oov_vocab = pickle.load(fh)
+            with open(_OOV_VOCAB_PATH, "r", encoding="utf-8") as fh:
+                _oov_vocab = set(json.load(fh))
             print(f"[serving] OOV 词表已加载: {len(_oov_vocab)} 词")
         except Exception as e:
             print(f"[serving] OOV 词表加载失败，护栏降级为全放行: {e}")
@@ -163,8 +163,8 @@ def _redline_hit(text: str) -> list[str]:
     global _redline_words
     if _redline_words is None:
         try:
-            with open(_REDLINE_WORDS_PATH, "rb") as fh:
-                _redline_words = pickle.load(fh)
+            with open(_REDLINE_WORDS_PATH, "r", encoding="utf-8") as fh:
+                _redline_words = set(json.load(fh))
             print(f"[serving] 红线词表已加载: {len(_redline_words)} 词")
         except Exception as e:
             print(f"[serving] 红线词表加载失败，红线护栏降级为全放行: {e}")
@@ -287,6 +287,8 @@ def feedback(req: FeedbackRequest, request: Request, x_api_key: str | None = Hea
     if key and (not x_api_key or not hmac.compare_digest(x_api_key, key)):
         raise HTTPException(status_code=401, detail="缺少或错误的 X-API-Key 请求头")
     _check_rate(request, FEEDBACK_RATE_LIMIT)
+    if len(_fb_seen_sns()) >= FEEDBACK_MAX_SN:
+        raise HTTPException(status_code=429, detail="反馈已达容量上限，请联系运维调大 FEEDBACK_MAX_SN")
     n = conf.num_classes
     if not (0 <= req.human_class < n):
         raise HTTPException(status_code=400, detail=f"human_class 需在 0-{n - 1}")
