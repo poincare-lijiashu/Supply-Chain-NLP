@@ -104,7 +104,7 @@ python scripts/eval_student_v2.py         # 学生六尺验收
 **方式一：Docker（推荐，脱离本机环境）**
 ```bash
 docker compose up -d            # 构建+启动（DATA_VERSION=v2，加载蒸馏学生），访问 http://localhost:18000
-docker compose up -d --scale api=3   # 无状态服务，水平扩容（前置 Nginx/网关做负载均衡）
+docker compose up -d --scale api=4   # 无状态服务，水平扩容（前置 Nginx/网关做负载均衡）
 ```
 镜像内含：CPU 版 torch + 代码 + 分词器 + 蒸馏学生权重（21MB）+ 红线/OOV 护栏词表，
 不依赖本机环境；`./data/feedback` 挂载为卷，复检终判回流持久化（容器重建不丢）。
